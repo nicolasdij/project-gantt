@@ -51,11 +51,15 @@ body {
   min-width: 0;
 }
 .panel-grid {
-  flex: 1 1 55%;
+  /* Ancho FIJO: no crece ni se encoge al redimensionar la ventana; se ajusta a
+     sus columnas. El cambio de ancho de la ventana lo absorbe el panel derecho. */
+  flex: 0 0 auto;
   border-right: 1px solid var(--border-strong);
 }
 .panel-timeline {
-  flex: 1 1 45%;
+  /* Prioridad: absorbe todo el ancho restante al redimensionar la ventana. */
+  flex: 1 1 0;
+  min-width: 0;
   position: relative;
   background: var(--bg);
 }
