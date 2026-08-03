@@ -1,0 +1,57 @@
+# ---------- Dependencias ----------
+node_modules/
+.pnp
+.pnp.js
+
+# ---------- Builds / salidas ----------
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# ---------- Caché de herramientas ----------
+.vite/
+.cache/
+.eslintcache
+.turbo/
+
+# ---------- Variables de entorno ----------
+# Se ignoran los .env reales; se versiona la plantilla .env.example.
+.env
+.env.*
+!.env.example
+
+# ---------- Logs ----------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+
+# ---------- Tests / cobertura ----------
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# ---------- Base de datos local (por si se usa SQLite en algún momento) ----------
+*.sqlite
+*.sqlite3
+*.db
+
+# NOTA: server/prisma/migrations/ SÍ se versiona (no ignorar).
+
+# ---------- Sistema operativo ----------
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---------- Editores / IDEs ----------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~

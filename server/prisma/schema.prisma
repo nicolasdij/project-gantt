@@ -1,0 +1,55 @@
+// Esquema Prisma — Project Gantt
+// Fase 1: tabla `tasks` según SPEC.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  // ID secuencial estilo MS Project. Se usa en Dependencies y es la columna "ID" del grid.
+  id            Int      @id @default(autoincrement())
+
+  // WBS jerárquico (1, 1.1, 1.2.1). Calculado server-side, pero se persiste.
+  wbs           String   @default("")
+
+  // Jerarquía padre-hijo (self-relation). Null = fila raíz.
+  parentId      Int?
+  parent        Task?    @relation("Subtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  children      Task[]   @relation("Subtasks")
+
+  // Orden entre hermanos / orden global de visualización.
+  order         Int      @default(0)
+
+  title         String   @default("")
+
+  // Fechas de inicio/fin. Se guardan como fecha (la hora se ignora en la lógica de negocio).
+  start         DateTime?
+  end           DateTime?
+
+  // Duración en días laborables (inclusive). 0 = milestone.
+  durationDays  Int      @default(1)
+
+  // Milestone: caso especial cuando start == end (duración 0d), se dibuja como rombo.
+  isMilestone   Boolean  @default(false)
+
+  // Un solo responsable.
+  owner         String?
+
+  // Dependencias como texto, ej. "3FS" (Finish-Start con el ID 3). Tipos v1: FS, SS, FF.
+  dependencies  String?
+
+  // Descripción rich-text guardada como Markdown (editada desde el modal).
+  descriptionMd String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([order])
+  @@map("tasks")
+}

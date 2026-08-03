@@ -1,0 +1,526 @@
+:root {
+  --border: #d7dbe0;
+  --border-strong: #b9bfc7;
+  --bg: #ffffff;
+  --bg-header: #f4f6f8;
+  --bg-parent: #eef1f4;
+  --bg-selected: #dbeafe;
+  --bg-hover: #f7f9fb;
+  --text: #1b1f24;
+  --muted: #7a828c;
+  --accent: #2563eb;
+  --milestone: #7c3aed;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+/* ---------- Layout ---------- */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.app-header {
+  border-bottom: 1px solid var(--border-strong);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.app-header h1 {
+  font-size: 16px;
+  margin: 0;
+  white-space: nowrap;
+}
+.app-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.panel {
+  overflow: auto;
+  min-width: 0;
+}
+.panel-grid {
+  flex: 1 1 55%;
+  border-right: 1px solid var(--border-strong);
+}
+.panel-timeline {
+  flex: 1 1 45%;
+  position: relative;
+  background: var(--bg);
+}
+
+/* ---------- Timeline (Gantt) ---------- */
+.tl-content {
+  position: relative;
+}
+.tl-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-strong);
+}
+.tl-tickrow {
+  position: relative;
+}
+.tl-major {
+  border-bottom: 1px solid var(--border);
+}
+.tl-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--muted);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.tl-major .tl-tick {
+  font-weight: 600;
+  color: var(--text);
+}
+.tl-body {
+  position: relative;
+}
+.tl-col-sep {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  background: var(--border);
+}
+.tl-band {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  border-bottom: 1px solid #eef1f4;
+  cursor: pointer;
+}
+.tl-band:hover {
+  background: var(--bg-hover);
+}
+.tl-band-selected {
+  background: var(--bg-selected);
+}
+.tl-today {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  background: #ef4444;
+  z-index: 2;
+}
+.tl-bar {
+  position: absolute;
+  background: #3b82f6;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  z-index: 1;
+}
+.tl-bar-parent {
+  background: #475569;
+  border-radius: 2px;
+}
+.tl-milestone {
+  position: absolute;
+  background: var(--milestone);
+  transform: rotate(45deg);
+  z-index: 1;
+}
+.tl-arrows {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 2;
+}
+.tl-arrow-path {
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 1.4;
+}
+.tl-arrowhead {
+  fill: #64748b;
+}
+.state {
+  padding: 16px;
+}
+.state.error {
+  color: #b91c1c;
+}
+
+/* ---------- Toolbar ---------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+.tb-group {
+  display: flex;
+  gap: 2px;
+}
+.tb-btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 15px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.tb-btn.tb-zoom {
+  font-size: 13px;
+}
+.tb-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+.tb-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.tb-btn.tb-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.tb-spacer {
+  flex: 1;
+}
+.save-indicator {
+  color: var(--muted);
+  font-size: 13px;
+  min-width: 82px;
+  text-align: right;
+}
+
+/* ---------- Grid ---------- */
+.grid-wrap {
+  min-width: max-content;
+}
+table.grid {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.grid th,
+.grid td {
+  /* Separador de columna: borde vertical (no afecta al alto de fila).
+     Separador de fila: box-shadow inferior (NO ocupa espacio), así cada fila
+     mide exactamente ROW_H y queda alineada 1:1 con las bandas del timeline. */
+  border-right: 1px solid var(--border);
+  box-shadow: inset 0 -1px 0 var(--border);
+  padding: 0;
+  text-align: left;
+}
+.grid th:first-child,
+.grid td:first-child {
+  border-left: 1px solid var(--border);
+}
+.grid thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-header);
+  z-index: 1;
+  height: 48px; /* HEAD_H — debe coincidir con layout.ts */
+  padding: 0 8px;
+  vertical-align: middle;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: inset 0 -1px 0 var(--border-strong);
+}
+.grid tbody tr {
+  height: 30px; /* ROW_H — debe coincidir con layout.ts */
+}
+.grid tbody td {
+  height: 30px;
+  padding: 0;
+}
+.grid tbody tr:hover {
+  background: var(--bg-hover);
+}
+.grid tbody tr.row-parent {
+  background: var(--bg-parent);
+  font-weight: 600;
+}
+.grid tbody tr.row-selected {
+  background: var(--bg-selected) !important;
+}
+
+.col-id {
+  width: 44px;
+}
+.col-wbs {
+  width: 64px;
+}
+.col-title {
+  min-width: 240px;
+}
+.col-date {
+  width: 130px;
+}
+.col-dur {
+  width: 84px;
+}
+.col-owner {
+  width: 130px;
+}
+.col-deps {
+  width: 120px;
+}
+.num {
+  text-align: right;
+}
+
+.id-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+  height: 30px;
+  line-height: 30px;
+  padding: 0 8px;
+  font: inherit;
+  width: 100%;
+  text-align: right;
+}
+.col-wbs.num {
+  height: 30px;
+  line-height: 30px;
+  padding: 0 8px;
+  color: var(--muted);
+}
+.title-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+}
+.milestone-mark {
+  color: var(--milestone);
+  font-size: 12px;
+}
+.ro {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 8px;
+  color: var(--muted);
+}
+
+/* Inputs de celda: ocupan toda la celda, sin borde salvo al enfocar. */
+.cell-input {
+  width: 100%;
+  height: 30px;
+  line-height: 28px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0 8px;
+  font: inherit;
+  color: inherit;
+}
+.cell-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg);
+}
+.row-parent .cell-input {
+  font-weight: 600;
+}
+
+/* ---------- Modal ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+  z-index: 10;
+}
+.modal {
+  background: var(--bg);
+  border-radius: 10px;
+  width: 640px;
+  max-width: 100%;
+  max-height: 85vh;
+  overflow: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+.modal-header h2 {
+  font-size: 15px;
+  margin: 0;
+}
+.modal-wbs {
+  color: var(--accent);
+}
+.modal-close {
+  border: none;
+  background: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.modal-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.field > span {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.field .cell-input {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 9px;
+}
+.field-row {
+  display: flex;
+  gap: 12px;
+}
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- Confirm dialog ---------- */
+.confirm-dialog {
+  background: var(--bg);
+  border-radius: 10px;
+  width: 420px;
+  max-width: 100%;
+  padding: 20px 22px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.confirm-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.confirm-title.notice-error {
+  color: #b91c1c;
+}
+.confirm-message {
+  margin: 0 0 18px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 7px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+.btn:hover {
+  background: var(--bg-hover);
+}
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  filter: brightness(0.95);
+  background: var(--accent);
+}
+.btn-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+.btn-danger:hover {
+  filter: brightness(0.95);
+  background: #dc2626;
+}
+.btn-ghost {
+  background: transparent;
+}
+
+/* ---------- Markdown editor ---------- */
+.md-editor {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.md-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-header);
+}
+.md-btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.md-btn:hover {
+  background: var(--bg-hover);
+}
+.md-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+}
+.md-content {
+  min-height: 120px;
+  padding: 10px 12px;
+  outline: none;
+  line-height: 1.5;
+}
+.md-content:focus {
+  background: #fffef8;
+}
+.md-content ul,
+.md-content ol {
+  margin: 6px 0;
+  padding-left: 22px;
+}

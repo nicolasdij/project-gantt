@@ -1,0 +1,64 @@
+# Docker Compose — entorno de DESARROLLO (3 contenedores).
+# db + server + client, todos con hot-reload donde aplica.
+# Para producción (opción A: nginx sirviendo el build) se usará docker-compose.prod.yml (fase posterior).
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gantt-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gantt
+      POSTGRES_PASSWORD: gantt
+      POSTGRES_DB: gantt
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gantt -d gantt"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    container_name: gantt-server
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://gantt:gantt@db:5432/gantt?schema=public"
+      PORT: "3000"
+      HOST: "0.0.0.0"
+    ports:
+      - "3000:3000"
+    volumes:
+      # Código montado para hot-reload; node_modules queda dentro del contenedor.
+      - ./server:/app
+      - server-node-modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    container_name: gantt-client
+    restart: unless-stopped
+    environment:
+      # El proxy de Vite (ver vite.config.ts) apunta al server dentro de la red de Compose.
+      VITE_API_TARGET: "http://server:3000"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - client-node-modules:/app/node_modules
+    depends_on:
+      - server
+
+volumes:
+  db-data:
+  server-node-modules:
+  client-node-modules:
