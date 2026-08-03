@@ -47,32 +47,37 @@ type DateProps = {
 export function EditableDate({ value, onCommit }: DateProps) {
   const ref = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(value);
-  // Última fecha ya confirmada, para no commitear dos veces (change + blur del mismo valor).
+  // Último valor ya confirmado, para no commitear dos veces el mismo valor.
   const committed = useRef(value);
+  // ¿El cambio actual provino de TECLEO? Si sí, se recalcula en el blur; si no
+  // (viene del datepicker), se recalcula de inmediato.
+  const typed = useRef(false);
   useEffect(() => {
     setDraft(value);
     committed.current = value;
   }, [value]);
 
-  const maybeCommit = () => {
+  const commit = () => {
     const v = ref.current?.value ?? draft;
-    if (v !== value && v !== committed.current) {
+    if (v !== committed.current) {
       committed.current = v;
       onCommit(v);
     }
   };
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
 
-  // Escucha el evento NATIVO `change` (no el `onChange` de React, que es `input` y
-  // se dispara por cada segmento). El `change` nativo salta al elegir en el date
-  // picker (de inmediato) y al perder el foco tras escribir — nunca por cada tecla.
-  const latest = useRef(maybeCommit);
-  latest.current = maybeCommit;
+  // Evento NATIVO `change` (no el `onChange` de React, que es `input` y salta por
+  // cada segmento). Al elegir en el datepicker no hubo tecleo → confirmar ya; si
+  // hubo tecleo, se difiere al blur (no recalcular mientras se escribe).
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const handler = () => latest.current();
-    el.addEventListener("change", handler);
-    return () => el.removeEventListener("change", handler);
+    const onNativeChange = () => {
+      if (!typed.current) commitRef.current();
+    };
+    el.addEventListener("change", onNativeChange);
+    return () => el.removeEventListener("change", onNativeChange);
   }, []);
 
   return (
@@ -82,11 +87,18 @@ export function EditableDate({ value, onCommit }: DateProps) {
       className="cell-input"
       value={draft}
       onChange={(e) => setDraft(e.target.value)} // solo actualiza el draft (no recalcula)
-      onBlur={maybeCommit}
+      onBlur={() => {
+        commit(); // recalcula al quitar el foco (caso tecleo)
+        typed.current = false;
+      }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") ref.current?.blur();
-        else if (e.key === "Escape") {
+        typed.current = true; // hubo tecleo → no recalcular hasta el blur
+        if (e.key === "Enter") {
+          ref.current?.blur();
+        } else if (e.key === "Escape") {
+          if (ref.current) ref.current.value = value; // revierte el DOM sin disparar change
           setDraft(value);
+          typed.current = false;
           ref.current?.blur();
         }
       }}
