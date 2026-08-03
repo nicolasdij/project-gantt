@@ -8,6 +8,27 @@ export type Dependency = { predId: number; type: DepType };
 
 const SUPPORTED: DepType[] = ["FS", "SS", "FF"];
 
+/**
+ * Reescribe los números de un string de dependencias usando `map`.
+ * Se usa para traducir entre la clave interna estable y el ID visible (order+1):
+ *   - al LEER: map = idInterno → IDvisible
+ *   - al ESCRIBIR: map = IDvisible → idInterno
+ * Los tokens cuyo número no está en el mapa (ej. predecesor borrado) se descartan.
+ */
+export function remapDependencies(
+  raw: string | null | undefined,
+  map: Map<number, number>,
+): string | null {
+  if (!raw) return raw ?? null;
+  const out = parseDependencies(raw)
+    .map((d) => {
+      const n = map.get(d.predId);
+      return n != null ? `${n}${d.type}` : null;
+    })
+    .filter((x): x is string => x !== null);
+  return out.join(", ");
+}
+
 export function parseDependencies(raw: string | null | undefined): Dependency[] {
   if (!raw) return [];
   const tokens = raw.split(/[,;\s]+/).map((t) => t.trim()).filter(Boolean);

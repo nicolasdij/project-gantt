@@ -6,17 +6,42 @@ import { prisma } from "../db.ts";
 import { recalcDates } from "../lib/recalc.ts";
 import { recomputeProject, isParent } from "../services/project.ts";
 import { computeCriticalPath, type CriticalTask } from "../lib/critical.ts";
+import { remapDependencies } from "../lib/deps.ts";
 
 // Campos de contenido editables directamente (no disparan recálculo de fechas).
-const CONTENT_FIELDS = ["title", "owner", "dependencies", "descriptionMd"] as const;
+const CONTENT_FIELDS = ["title", "owner", "descriptionMd"] as const;
 // Campos que disparan el motor de recálculo de fechas.
 const DATE_FIELDS = ["start", "end", "durationDays"] as const;
 
+// El ID VISIBLE de una tarea es `order + 1` (secuencial 1..N que se renumera solo).
+// La clave interna (`id`) es estable y es a la que apuntan las Dependencies almacenadas.
+// Estas utilidades traducen las Dependencies entre ambos mundos en el borde de la API.
+type SeqTask = { id: number; order: number; dependencies: string | null };
+function buildMaps(tasks: SeqTask[]) {
+  const idToSeq = new Map<number, number>();
+  const seqToId = new Map<number, number>();
+  for (const t of tasks) {
+    const seq = t.order + 1;
+    idToSeq.set(t.id, seq);
+    seqToId.set(seq, t.id);
+  }
+  return { idToSeq, seqToId };
+}
+// Devuelve la tarea con sus Dependencies traducidas a ID visible (para el cliente).
+function toSeq<T extends { dependencies: string | null }>(task: T, idToSeq: Map<number, number>): T {
+  return { ...task, dependencies: remapDependencies(task.dependencies, idToSeq) };
+}
+
 export async function taskRoutes(app: FastifyInstance) {
+  // Lista ordenada con Dependencies ya traducidas a ID visible (para el cliente).
+  const listForClient = async () => {
+    const tasks = await prisma.task.findMany({ orderBy: { order: "asc" } });
+    const { idToSeq } = buildMaps(tasks);
+    return tasks.map((t) => toSeq(t, idToSeq));
+  };
+
   // --- LISTA ---
-  app.get("/api/tasks", async () => {
-    return prisma.task.findMany({ orderBy: { order: "asc" } });
-  });
+  app.get("/api/tasks", async () => listForClient());
 
   // --- CAMINO CRÍTICO (CPM) ---
   // Devuelve los ids de las tareas críticas (holgura 0). Ruta estática: tiene
@@ -29,9 +54,10 @@ export async function taskRoutes(app: FastifyInstance) {
   // --- DETALLE ---
   app.get("/api/tasks/:id", async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
-    const task = await prisma.task.findUnique({ where: { id } });
+    const tasks = await prisma.task.findMany({ orderBy: { order: "asc" } });
+    const task = tasks.find((t) => t.id === id);
     if (!task) return reply.code(404).send({ error: "Task no encontrada" });
-    return task;
+    return toSeq(task, buildMaps(tasks).idToSeq);
   });
 
   // --- CREAR (add row) ---
@@ -74,7 +100,9 @@ export async function taskRoutes(app: FastifyInstance) {
     });
 
     await recomputeProject();
-    return reply.code(201).send(await prisma.task.findUnique({ where: { id: created.id } }));
+    const tasks = await prisma.task.findMany({ orderBy: { order: "asc" } });
+    const fresh = tasks.find((t) => t.id === created.id)!;
+    return reply.code(201).send(toSeq(fresh, buildMaps(tasks).idToSeq));
   });
 
   // --- AUTOSAVE / EDITAR (last-write-wins por campo) ---
@@ -89,6 +117,14 @@ export async function taskRoutes(app: FastifyInstance) {
     // Campos de contenido: se aplican tal cual.
     for (const f of CONTENT_FIELDS) {
       if (f in body) data[f] = body[f];
+    }
+
+    // Dependencies: llegan en ID VISIBLE (seq) → traducir a id interno antes de guardar.
+    if ("dependencies" in body) {
+      const all = await prisma.task.findMany();
+      const { seqToId } = buildMaps(all);
+      const raw = body.dependencies == null ? "" : String(body.dependencies);
+      data.dependencies = remapDependencies(raw, seqToId);
     }
 
     // Campos de fecha: pasan por el motor de recálculo.
@@ -128,14 +164,13 @@ export async function taskRoutes(app: FastifyInstance) {
 
     await prisma.task.update({ where: { id }, data });
     await recomputeProject(); // actualiza roll-up de ancestros si cambiaron fechas
-    return prisma.task.findUnique({ where: { id } });
+    const tasks = await prisma.task.findMany({ orderBy: { order: "asc" } });
+    return toSeq(tasks.find((t) => t.id === id)!, buildMaps(tasks).idToSeq);
   });
 
   // Helper: hermanos (misma parentId) ordenados.
   const siblingsOf = (parentId: number | null) =>
     prisma.task.findMany({ where: { parentId }, orderBy: { order: "asc" } });
-
-  const listOrdered = () => prisma.task.findMany({ orderBy: { order: "asc" } });
 
   // --- MOVER ARRIBA / ABAJO (reordenar entre hermanos) ---
   app.post("/api/tasks/:id/move", async (req, reply) => {
@@ -151,7 +186,7 @@ export async function taskRoutes(app: FastifyInstance) {
     const idx = sibs.findIndex((s) => s.id === id);
     const swapIdx = dir === "up" ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= sibs.length) {
-      return listOrdered(); // extremo: no-op
+      return listForClient(); // extremo: no-op
     }
     const other = sibs[swapIdx];
     await prisma.$transaction([
@@ -159,7 +194,7 @@ export async function taskRoutes(app: FastifyInstance) {
       prisma.task.update({ where: { id: other.id }, data: { order: task.order } }),
     ]);
     await recomputeProject();
-    return listOrdered();
+    return listForClient();
   });
 
   // --- INDENT (convertir en hijo del hermano anterior) ---
@@ -185,7 +220,7 @@ export async function taskRoutes(app: FastifyInstance) {
       data: { parentId: newParent.id, order: newOrder },
     });
     await recomputeProject();
-    return listOrdered();
+    return listForClient();
   });
 
   // --- OUTDENT (subir un nivel, quedando justo después del antiguo padre) ---
@@ -216,7 +251,7 @@ export async function taskRoutes(app: FastifyInstance) {
       ),
     );
     await recomputeProject();
-    return listOrdered();
+    return listForClient();
   });
 
   // --- BORRAR (delete row) ---

@@ -72,7 +72,8 @@ export function Grid({ tasks }: { tasks: Task[] }) {
                       openModal(t.id);
                     }}
                   >
-                    {t.id}
+                    {/* ID visible = posición (order+1): siempre 1..N, se renumera solo. */}
+                    {t.order + 1}
                   </button>
                 </td>
 

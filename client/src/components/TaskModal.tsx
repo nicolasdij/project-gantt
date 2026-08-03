@@ -42,7 +42,7 @@ export function TaskModal() {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>
-            <span className="modal-wbs">{task.wbs}</span> · ID {task.id}
+            <span className="modal-wbs">{task.wbs}</span> · ID {task.order + 1}
           </h2>
           <button className="modal-close" title="Cerrar" onClick={closeModal}>
             ✕

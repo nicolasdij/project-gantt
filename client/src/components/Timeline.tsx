@@ -67,6 +67,12 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
 
   const bodyHeight = tasks.length * ROW_H;
 
+  // Las Dependencies vienen en ID VISIBLE (order+1). Mapa seq → id interno.
+  const idBySeq = useMemo(
+    () => new Map(tasks.map((t) => [t.order + 1, t.id])),
+    [tasks],
+  );
+
   // Flechas de dependencia.
   const arrows = useMemo(() => {
     const paths: { d: string; key: string }[] = [];
@@ -75,7 +81,9 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
       const succ = geom.get(t.id);
       if (!succ || (!t.start && !t.end)) continue;
       for (const dep of parseDependencies(t.dependencies)) {
-        const pred = geom.get(dep.predId);
+        const predId = idBySeq.get(dep.predId); // dep.predId es un ID visible
+        if (predId == null) continue;
+        const pred = geom.get(predId);
         if (!pred) continue;
         let x1: number, x2: number;
         if (dep.type === "SS") {
@@ -107,7 +115,7 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
       }
     }
     return paths;
-  }, [tasks, geom]);
+  }, [tasks, geom, idBySeq]);
 
   return (
     <div className="panel panel-timeline" ref={ref}>
