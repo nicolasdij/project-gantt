@@ -11,6 +11,11 @@ import { ROW_H, HEAD_H } from "../lib/layout.ts";
 
 type Geom = { startX: number; endX: number; cy: number; isMilestone: boolean };
 
+// Rombo del milestone: cuadro de lado MS_SIZE rotado 45°. La distancia del centro
+// a cada vértice (izq/der) es la semidiagonal = MS_SIZE * √2 / 2.
+const MS_SIZE = ROW_H / 2;
+const MS_HALF_DIAG = MS_SIZE * Math.SQRT1_2;
+
 export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Timeline(
   { tasks },
   ref,
@@ -41,9 +46,16 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
         return;
       }
       if (t.isMilestone) {
-        // Milestone: anclado al CENTRO de la columna de su día (start == end).
+        // Milestone: centrado en la columna de su día. Los puntos de conexión de
+        // las flechas son los VÉRTICES del rombo (no el centro), para que la flecha
+        // termine en el vértice: izquierdo = inicio (FS/SS), derecho = fin (FF).
         const center = scale.xOf(t.start) + scale.dayWidth / 2;
-        map.set(t.id, { startX: center, endX: center, cy, isMilestone: true });
+        map.set(t.id, {
+          startX: center - MS_HALF_DIAG, // vértice izquierdo
+          endX: center + MS_HALF_DIAG, // vértice derecho
+          cy,
+          isMilestone: true,
+        });
         return;
       }
       const startX = scale.xOf(t.start);
@@ -152,12 +164,13 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
             const isParent = parentIds.has(t.id);
             const critical = isCritical(t.id);
             if (t.isMilestone) {
-              // g.startX ya es el centro de la columna del día → rombo centrado.
+              // El centro es el punto medio entre los vértices izq/der guardados en geom.
+              const center = (g.startX + g.endX) / 2;
               return (
                 <div
                   key={`bar${t.id}`}
                   className={`tl-milestone ${critical ? "tl-critical" : ""}`}
-                  style={{ left: g.startX - ROW_H / 4, top: g.cy - ROW_H / 4, width: ROW_H / 2, height: ROW_H / 2 }}
+                  style={{ left: center - MS_SIZE / 2, top: g.cy - MS_SIZE / 2, width: MS_SIZE, height: MS_SIZE }}
                   title={t.title}
                 />
               );
