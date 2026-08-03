@@ -97,6 +97,12 @@ body {
 .tl-body {
   position: relative;
 }
+.tl-weekend {
+  position: absolute;
+  top: 0;
+  background: #eef1f4; /* gris claro para sábados y domingos */
+  z-index: 0;
+}
 .tl-col-sep {
   position: absolute;
   top: 0;
@@ -139,6 +145,16 @@ body {
   background: var(--milestone);
   transform: rotate(45deg);
   z-index: 1;
+}
+/* Camino crítico: barras y milestones en rojo. */
+.tl-bar.tl-critical {
+  background: #dc2626;
+}
+.tl-bar-parent.tl-critical {
+  background: #991b1b;
+}
+.tl-milestone.tl-critical {
+  background: #dc2626;
 }
 .tl-arrows {
   position: absolute;

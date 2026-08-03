@@ -48,14 +48,27 @@ export function EditableDate({ value, onCommit }: DateProps) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
 
+  // Confirma SOLO al perder el foco (o Enter): así el recálculo Start/End/Duration
+  // y el redibujado del Gantt ocurren cuando el usuario termina de editar, no en cada cambio.
+  const commit = () => {
+    if (draft !== value) onCommit(draft);
+  };
+
   return (
     <input
       type="date"
       className="cell-input"
       value={draft}
-      onChange={(e) => {
-        setDraft(e.target.value);
-        if (e.target.value && e.target.value !== value) onCommit(e.target.value);
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          commit();
+          (e.target as HTMLInputElement).blur();
+        } else if (e.key === "Escape") {
+          setDraft(value);
+          (e.target as HTMLInputElement).blur();
+        }
       }}
     />
   );

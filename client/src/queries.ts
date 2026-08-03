@@ -5,9 +5,20 @@ import { api, type PatchData } from "./api.ts";
 import { useUI } from "./store.ts";
 
 const KEY = ["tasks"] as const;
+const CRITICAL_KEY = ["critical"] as const;
 
 export function useTasks() {
   return useQuery({ queryKey: KEY, queryFn: api.list });
+}
+
+/** Ids del camino crítico. Solo consulta cuando el toggle está activo. */
+export function useCriticalPath(enabled: boolean) {
+  return useQuery({
+    queryKey: CRITICAL_KEY,
+    queryFn: api.critical,
+    enabled,
+    select: (d) => new Set(d.criticalIds),
+  });
 }
 
 /** Indicador global de autosave: cuántas mutaciones hay en vuelo. */
@@ -17,7 +28,11 @@ export function useSavingCount() {
 
 export function useTaskMutations() {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: KEY });
+  // Toda mutación puede cambiar fechas/dependencias → invalida tareas Y camino crítico.
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: KEY });
+    qc.invalidateQueries({ queryKey: CRITICAL_KEY });
+  };
   const onError = (e: unknown) => {
     // Errores de negocio (ej. editar fecha de un padre → 409) se muestran en un
     // modal propio (nunca con alert()). Se accede al store fuera de React.

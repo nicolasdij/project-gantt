@@ -12,6 +12,8 @@ type UIState = {
   closeModal: () => void;
   zoom: Zoom;
   setZoom: (zoom: Zoom) => void;
+  showCritical: boolean;
+  toggleCritical: () => void;
   // Notificaciones (errores/avisos) mostradas como modal propio, nunca con alert().
   notice: Notice | null;
   notify: (notice: Notice) => void;
@@ -27,6 +29,8 @@ export const useUI = create<UIState>((set) => ({
   closeModal: () => set({ modalTaskId: null }),
   zoom: "week",
   setZoom: (zoom) => set({ zoom }),
+  showCritical: false,
+  toggleCritical: () => set((s) => ({ showCritical: !s.showCritical })),
   notice: null,
   notify: (notice) => set({ notice }),
   showError: (message) => set({ notice: { kind: "error", title: "Error", message } }),

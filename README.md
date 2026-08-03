@@ -150,5 +150,5 @@ Implementación **fase por fase** (plan detallado en [`SPEC.md`](./SPEC.md)).
 - [x] **Fase 2** — Backend / API (CRUD, autosave, WBS, roll-up, fechas laborables)
 - [x] **Fase 3** — Panel izquierdo (grid editable, modal, indent/outdent, reordenar)
 - [x] **Fase 4** — Panel derecho (Gantt: barras, zoom, hoy, dependencias, milestones)
-- [ ] **Fase 5** — Camino crítico (CPM)
-- [ ] **Fase 6** — Pulido (validaciones, manejo de errores, autosave con debounce)
+- [x] **Fase 5** — Camino crítico (CPM: backward pass sobre FS/SS/FF + toggle rojo)
+- [x] **Fase 6** — Pulido (commit al perder foco, fines de semana sombreados, milestone centrado, indicador de autosave, errores por modal)

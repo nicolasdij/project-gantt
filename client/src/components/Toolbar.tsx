@@ -11,6 +11,8 @@ export function Toolbar() {
   const select = useUI((s) => s.select);
   const zoom = useUI((s) => s.zoom);
   const setZoom = useUI((s) => s.setZoom);
+  const showCritical = useUI((s) => s.showCritical);
+  const toggleCritical = useUI((s) => s.toggleCritical);
   const { data: tasks = [] } = useTasks();
   const { create, remove, indent, outdent, move } = useTaskMutations();
   const saving = useSavingCount();
@@ -87,7 +89,12 @@ export function Toolbar() {
       </div>
 
       <div className="tb-group">
-        <button className="tb-btn" title="Camino crítico (Fase 5)" disabled>
+        <button
+          className={`tb-btn ${showCritical ? "tb-active" : ""}`}
+          title="Camino crítico"
+          aria-pressed={showCritical}
+          onClick={toggleCritical}
+        >
           🔴
         </button>
       </div>

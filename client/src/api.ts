@@ -25,6 +25,7 @@ export type PatchData = Partial<
 
 export const api = {
   list: () => request<Task[]>("/api/tasks"),
+  critical: () => request<{ criticalIds: number[] }>("/api/tasks/critical"),
   patch: (id: number, data: PatchData) =>
     request<Task>(`/api/tasks/${id}`, {
       method: "PATCH",

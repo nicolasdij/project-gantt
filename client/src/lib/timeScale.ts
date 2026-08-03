@@ -19,6 +19,7 @@ export type TimeScale = {
   todayX: number | null;
   majorTicks: Tick[];
   minorTicks: Tick[];
+  weekendBands: { x: number; width: number }[];
 };
 
 const midnight = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -61,8 +62,41 @@ export function buildTimeScale(tasks: Task[], zoom: Zoom, today: Date): TimeScal
   const todayX = todayIdx >= 0 && todayIdx <= totalDays ? todayIdx * dayWidth : null;
 
   const { majorTicks, minorTicks } = buildTicks(min, totalDays, dayWidth, zoom);
+  const weekendBands = buildWeekendBands(min, totalDays, dayWidth);
 
-  return { origin: min, totalDays, dayWidth, width, xOf, dayIndexOf, todayX, majorTicks, minorTicks };
+  return {
+    origin: min,
+    totalDays,
+    dayWidth,
+    width,
+    xOf,
+    dayIndexOf,
+    todayX,
+    majorTicks,
+    minorTicks,
+    weekendBands,
+  };
+}
+
+// Agrupa días de fin de semana (sáb/dom) consecutivos en bandas para sombrearlos.
+function buildWeekendBands(origin: Date, totalDays: number, dayWidth: number) {
+  const bands: { x: number; width: number }[] = [];
+  const isWeekend = (i: number) => {
+    const wd = addDays(origin, i).getUTCDay();
+    return wd === 0 || wd === 6;
+  };
+  let i = 0;
+  while (i < totalDays) {
+    if (isWeekend(i)) {
+      let j = i;
+      while (j < totalDays && isWeekend(j)) j++;
+      bands.push({ x: i * dayWidth, width: (j - i) * dayWidth });
+      i = j;
+    } else {
+      i++;
+    }
+  }
+  return bands;
 }
 
 function buildTicks(origin: Date, totalDays: number, dayWidth: number, zoom: Zoom) {

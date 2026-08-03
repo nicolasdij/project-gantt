@@ -5,6 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.ts";
 import { recalcDates } from "../lib/recalc.ts";
 import { recomputeProject, isParent } from "../services/project.ts";
+import { computeCriticalPath, type CriticalTask } from "../lib/critical.ts";
 
 // Campos de contenido editables directamente (no disparan recálculo de fechas).
 const CONTENT_FIELDS = ["title", "owner", "dependencies", "descriptionMd"] as const;
@@ -15,6 +16,14 @@ export async function taskRoutes(app: FastifyInstance) {
   // --- LISTA ---
   app.get("/api/tasks", async () => {
     return prisma.task.findMany({ orderBy: { order: "asc" } });
+  });
+
+  // --- CAMINO CRÍTICO (CPM) ---
+  // Devuelve los ids de las tareas críticas (holgura 0). Ruta estática: tiene
+  // prioridad sobre /api/tasks/:id en el router de Fastify.
+  app.get("/api/tasks/critical", async () => {
+    const tasks = await prisma.task.findMany();
+    return { criticalIds: computeCriticalPath(tasks as unknown as CriticalTask[]) };
   });
 
   // --- DETALLE ---

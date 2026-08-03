@@ -101,3 +101,8 @@ Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en u
 3. **Alcance de entrega:** fase por fase, validando cada fase antes de pasar a la siguiente. ✅
 4. **Auto-scheduling por dependencias:** editar una dependencia reprograma las fechas del sucesor según el tipo (FS/SS/FF), conservando la Duration; con varias, gana la más tardía. El roll-up de padres se recalcula desde los hijos ya reprogramados. ✅
 5. **Link de edición en la columna ID** (no en WBS). El diálogo de borrado es un **modal propio** (no el `confirm()` del navegador). ✅
+6. **Pulido (Fase 6):**
+   - El recálculo Start/End/Duration y el redibujado del Gantt ocurren al **perder el foco** del campo (blur), no en cada tecla. ✅
+   - Las columnas de **fin de semana** (sáb/dom) se muestran en **gris claro** en el panel derecho. ✅
+   - El **rombo del milestone** se dibuja **centrado** dentro de la columna de su día. ✅
+   - Notificaciones/errores por **modal propio** (nunca `alert()`/`confirm()` del navegador). ✅

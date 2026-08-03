@@ -4,6 +4,7 @@
 import { forwardRef, useMemo } from "react";
 import type { Task } from "../types.ts";
 import { useUI } from "../store.ts";
+import { useCriticalPath } from "../queries.ts";
 import { parseDependencies } from "../lib/deps.ts";
 import { buildTimeScale } from "../lib/timeScale.ts";
 import { ROW_H, HEAD_H } from "../lib/layout.ts";
@@ -17,6 +18,9 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
   const zoom = useUI((s) => s.zoom);
   const selectedId = useUI((s) => s.selectedId);
   const select = useUI((s) => s.select);
+  const showCritical = useUI((s) => s.showCritical);
+  const { data: criticalSet } = useCriticalPath(showCritical);
+  const isCritical = (id: number) => showCritical && !!criticalSet?.has(id);
 
   // "Hoy" en medianoche local; solo para el marcador.
   const today = useMemo(() => new Date(), []);
@@ -36,9 +40,15 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
         map.set(t.id, { startX: 0, endX: 0, cy, isMilestone: t.isMilestone });
         return;
       }
+      if (t.isMilestone) {
+        // Milestone: anclado al CENTRO de la columna de su día (start == end).
+        const center = scale.xOf(t.start) + scale.dayWidth / 2;
+        map.set(t.id, { startX: center, endX: center, cy, isMilestone: true });
+        return;
+      }
       const startX = scale.xOf(t.start);
       const endX = scale.xOf(t.end) + scale.dayWidth; // borde derecho del día de fin
-      map.set(t.id, { startX, endX, cy, isMilestone: t.isMilestone });
+      map.set(t.id, { startX, endX, cy, isMilestone: false });
     });
     return map;
   }, [tasks, scale]);
@@ -110,6 +120,11 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
 
         {/* Cuerpo */}
         <div className="tl-body" style={{ width: scale.width, height: bodyHeight }}>
+          {/* Sombreado de fines de semana (al fondo) */}
+          {scale.weekendBands.map((w, i) => (
+            <div key={`we${i}`} className="tl-weekend" style={{ left: w.x, width: w.width, height: bodyHeight }} />
+          ))}
+
           {/* Separadores de mes (ticks mayores) */}
           {scale.majorTicks.map((tk, i) => (
             <div key={`sep${i}`} className="tl-col-sep" style={{ left: tk.x, height: bodyHeight }} />
@@ -135,13 +150,14 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
             const g = geom.get(t.id)!;
             if (!t.start || !t.end) return null;
             const isParent = parentIds.has(t.id);
+            const critical = isCritical(t.id);
             if (t.isMilestone) {
-              const cx = g.startX; // start == end en milestone
+              // g.startX ya es el centro de la columna del día → rombo centrado.
               return (
                 <div
                   key={`bar${t.id}`}
-                  className="tl-milestone"
-                  style={{ left: cx - ROW_H / 4, top: g.cy - ROW_H / 4, width: ROW_H / 2, height: ROW_H / 2 }}
+                  className={`tl-milestone ${critical ? "tl-critical" : ""}`}
+                  style={{ left: g.startX - ROW_H / 4, top: g.cy - ROW_H / 4, width: ROW_H / 2, height: ROW_H / 2 }}
                   title={t.title}
                 />
               );
@@ -151,7 +167,7 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
             return (
               <div
                 key={`bar${t.id}`}
-                className={`tl-bar ${isParent ? "tl-bar-parent" : ""}`}
+                className={`tl-bar ${isParent ? "tl-bar-parent" : ""} ${critical ? "tl-critical" : ""}`}
                 style={{ left: g.startX, top: g.cy - barH / 2, width: w, height: barH }}
                 title={t.title}
               />
