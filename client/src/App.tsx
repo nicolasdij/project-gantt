@@ -1,7 +1,9 @@
-// Layout: Toolbar arriba, panel izquierdo (grid) y panel derecho (timeline).
-// El scroll vertical de ambos paneles se mantiene sincronizado para que las
-// barras del Gantt queden alineadas con las filas del grid.
-import { useEffect, useRef } from "react";
+// Layout: Toolbar arriba, panel izquierdo (grid) y panel derecho (timeline),
+// separados por un splitter ARRASTRABLE. El ancho del panel izquierdo es un valor
+// controlado (px): se ajusta arrastrando el divisor y se MANTIENE al redimensionar
+// la ventana; el panel derecho absorbe el cambio de ancho (con scroll horizontal
+// interno si su contenido es más ancho). El scroll vertical de ambos va sincronizado.
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTasks } from "./queries.ts";
 import { Toolbar } from "./components/Toolbar.tsx";
 import { Grid } from "./components/Grid.tsx";
@@ -9,10 +11,58 @@ import { Timeline } from "./components/Timeline.tsx";
 import { TaskModal } from "./components/TaskModal.tsx";
 import { NoticeModal } from "./components/NoticeModal.tsx";
 
+const MIN_GRID = 240; // ancho mínimo de cada panel al arrastrar
+
 export default function App() {
   const { data: tasks, isLoading, isError, error } = useTasks();
   const gridRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
+
+  // Ancho del panel izquierdo (px). null hasta medir el ancho natural (todas las columnas).
+  const [gridWidth, setGridWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (gridWidth == null && tasks && gridRef.current) {
+      setGridWidth(gridRef.current.scrollWidth);
+    }
+  }, [tasks, gridWidth]);
+
+  // --- Arrastre del splitter ---
+  const drag = useRef<{ startX: number; startW: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const onSplitterDown = (e: React.MouseEvent) => {
+    const startW = gridWidth ?? gridRef.current?.offsetWidth ?? 0;
+    drag.current = { startX: e.clientX, startW };
+    setDragging(true);
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!drag.current) return;
+      const raw = drag.current.startW + (e.clientX - drag.current.startX);
+      const max = window.innerWidth - MIN_GRID;
+      setGridWidth(Math.max(MIN_GRID, Math.min(raw, max)));
+    };
+    const onUp = () => {
+      if (drag.current) {
+        drag.current = null;
+        setDragging(false);
+      }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  // Cursor/selección global mientras se arrastra.
+  useEffect(() => {
+    document.body.style.userSelect = dragging ? "none" : "";
+    document.body.style.cursor = dragging ? "col-resize" : "";
+  }, [dragging]);
 
   // Sincroniza el scroll vertical entre grid y timeline (bidireccional, sin bucle).
   useEffect(() => {
@@ -36,6 +86,9 @@ export default function App() {
     };
   }, [tasks]);
 
+  const gridStyle =
+    gridWidth != null ? { flex: `0 0 ${gridWidth}px`, width: gridWidth } : undefined;
+
   return (
     <div className="app">
       <header className="app-header">
@@ -44,13 +97,24 @@ export default function App() {
       </header>
 
       <main className="app-main">
-        <section className="panel panel-grid" ref={gridRef}>
+        <section className="panel panel-grid" ref={gridRef} style={gridStyle}>
           {isLoading && <p className="state">Cargando…</p>}
           {isError && <p className="state error">Error: {(error as Error)?.message}</p>}
           {tasks && <Grid tasks={tasks} />}
         </section>
 
-        {tasks && <Timeline tasks={tasks} ref={timelineRef} />}
+        {tasks && (
+          <>
+            <div
+              className={`splitter ${dragging ? "dragging" : ""}`}
+              onMouseDown={onSplitterDown}
+              role="separator"
+              aria-orientation="vertical"
+              title="Arrastrar para redimensionar"
+            />
+            <Timeline tasks={tasks} ref={timelineRef} />
+          </>
+        )}
       </main>
 
       <TaskModal />
