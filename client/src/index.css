@@ -140,10 +140,9 @@ body {
   left: 0;
   width: 100%;
   border-bottom: 1px solid #eef1f4;
+  /* Sin resaltado al pasar el mouse: la banda solo se pinta cuando la fila está
+     seleccionada. El cursor sigue indicando que se puede clickear para seleccionar. */
   cursor: pointer;
-}
-.tl-band:hover {
-  background: var(--bg-hover);
 }
 .tl-band-selected {
   background: var(--bg-selected);
