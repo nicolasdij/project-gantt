@@ -4,7 +4,7 @@
 // la ventana; el panel derecho absorbe el cambio de ancho (con scroll horizontal
 // interno si su contenido es más ancho). El scroll vertical de ambos va sincronizado.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useTasks } from "./queries.ts";
+import { useTasks, useDiscardEmptyRowOnLeave } from "./queries.ts";
 import { Toolbar } from "./components/Toolbar.tsx";
 import { Grid } from "./components/Grid.tsx";
 import { Timeline } from "./components/Timeline.tsx";
@@ -15,6 +15,8 @@ const MIN_GRID = 240; // ancho mínimo de cada panel al arrastrar
 
 export default function App() {
   const { data: tasks, isLoading, isError, error } = useTasks();
+  // Al pasar la selección a otra fila, descarta la que se deja atrás si quedó vacía.
+  useDiscardEmptyRowOnLeave();
   const gridRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 

@@ -14,6 +14,7 @@ Toda la aplicación corre en **Docker**. Ver [`SPEC.md`](./SPEC.md) para la espe
 - **Diagrama de Gantt** con barras alineadas a las filas, escala **Day / Week / Month**, marcador de "hoy", flechas de dependencia (SVG) y scroll vertical sincronizado con el grid.
 - **Modal de detalle** (desde el link del ID) con editor de descripción rich-text guardado como Markdown y botones **Guardar / Cancelar** (el modal no es autosave: descarta si cancelás).
 - Reordenar / indent / outdent / add / delete filas.
+- **Descarte de filas en blanco:** al pasar la selección a otra fila, la que se deja atrás se elimina si quedó totalmente vacía (sin título, fechas, owner, dependencies ni descripción, y con la Duration sin tocar).
 
 > Estado: implementación **fase por fase** (ver [Roadmap](#roadmap)). Fases 1–4 completas.
 

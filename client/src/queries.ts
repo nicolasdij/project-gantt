@@ -1,7 +1,9 @@
 // Hooks de datos (React Query): fetch de tareas + mutaciones.
 // Toda mutación invalida ['tasks'] para releer el estado recalculado del server.
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient, useIsMutating } from "@tanstack/react-query";
 import { api, type PatchData } from "./api.ts";
+import type { Task } from "./types.ts";
 import { useUI } from "./store.ts";
 
 const KEY = ["tasks"] as const;
@@ -24,6 +26,61 @@ export function useCriticalPath(enabled: boolean) {
 /** Indicador global de autosave: cuántas mutaciones hay en vuelo. */
 export function useSavingCount() {
   return useIsMutating();
+}
+
+// Duración con la que nace una fila nueva (la pone el server al crearla). El campo
+// Duration nunca puede quedar vacío, así que "vacío" acá significa "sin tocar".
+const NEW_ROW_DURATION_DAYS = 1;
+
+/** ¿La fila está totalmente en blanco (nada que perder si se descarta)? */
+function isBlankRow(t: Task): boolean {
+  return (
+    t.title.trim() === "" &&
+    !t.start &&
+    !t.end &&
+    t.durationDays === NEW_ROW_DURATION_DAYS &&
+    !(t.owner ?? "").trim() &&
+    !(t.dependencies ?? "").trim() &&
+    // No está en el grid, pero una fila con descripción tiene contenido real.
+    !(t.descriptionMd ?? "").trim()
+  );
+}
+
+/**
+ * Descarta la fila que se deja atrás si quedó totalmente vacía: al mover la selección
+ * de una fila a otra, se evalúa la anterior y se borra si está en blanco.
+ *
+ * La evaluación espera a que no haya mutaciones ni refetch en vuelo: el autosave del
+ * blur dispara su PATCH justo antes del cambio de selección, así que decidir con la
+ * caché de ese instante borraría una fila que el usuario acaba de completar.
+ */
+export function useDiscardEmptyRowOnLeave() {
+  const { data: tasks = [], isFetching } = useTasks();
+  const selectedId = useUI((s) => s.selectedId);
+  const { remove } = useTaskMutations();
+  const saving = useIsMutating();
+
+  const [candidateId, setCandidateId] = useState<number | null>(null);
+  const prevSelected = useRef<number | null>(selectedId);
+
+  useEffect(() => {
+    const prev = prevSelected.current;
+    prevSelected.current = selectedId;
+    // Solo al pasar de una fila a OTRA fila (no al deseleccionar).
+    if (prev != null && selectedId != null && prev !== selectedId) setCandidateId(prev);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (candidateId == null) return;
+    if (saving > 0 || isFetching) return; // esperar el autosave y su refetch
+    const task = tasks.find((t) => t.id === candidateId);
+    setCandidateId(null);
+    if (!task || !isBlankRow(task)) return;
+    // Nunca borrar una fila con hijos: el borrado es en cascada.
+    if (tasks.some((t) => t.parentId === task.id)) return;
+    remove.mutate(task.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidateId, saving, isFetching, tasks]);
 }
 
 export function useTaskMutations() {
