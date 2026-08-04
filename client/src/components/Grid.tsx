@@ -61,8 +61,8 @@ export function Grid({ tasks }: { tasks: Task[] }) {
             <th className="col-date">Start</th>
             <th className="col-date">End</th>
             <th className="col-dur">Duration</th>
-            <th className="col-owner">Owner</th>
             <th className="col-deps">Dependencies</th>
+            <th className="col-owner">Owner</th>
           </tr>
         </thead>
         <tbody>
@@ -139,13 +139,6 @@ export function Grid({ tasks }: { tasks: Task[] }) {
                   )}
                 </td>
 
-                <td className="col-owner">
-                  <EditableText
-                    value={t.owner ?? ""}
-                    listId={OWNERS_LIST_ID}
-                    onCommit={(v) => edit(t.id, { owner: v })}
-                  />
-                </td>
                 {/* Dependencies: en un padre no se editan. Sus fechas son roll-up de los
                     hijos, así que la dependencia no programaría nada (va en el primer hijo).
                     Si quedó un valor de cuando la fila era hoja, se muestra: está ignorado,
@@ -165,6 +158,14 @@ export function Grid({ tasks }: { tasks: Task[] }) {
                       onCommit={(v) => edit(t.id, { dependencies: v })}
                     />
                   )}
+                </td>
+
+                <td className="col-owner">
+                  <EditableText
+                    value={t.owner ?? ""}
+                    listId={OWNERS_LIST_ID}
+                    onCommit={(v) => edit(t.id, { owner: v })}
+                  />
                 </td>
               </tr>
             );

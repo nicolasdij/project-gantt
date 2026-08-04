@@ -50,8 +50,8 @@ Rule applied: **one process per container**. Putting Postgres + Node + Vite in a
 | 4 | **Start Date** | Yes | Rendered in the format chosen in **Settings**. On edit → recomputes **End** (from Duration, skipping weekends). |
 | 5 | **End Date** | Yes | Rendered in the format chosen in **Settings**. On edit → recomputes **Duration**. |
 | 6 | **Duration** | Yes | `Nd` / `Nw` / `Nm` (a bare number means days). `1w` = 5 working days; `1m` = the working days per month set in **Settings**. Always stored and displayed in days, so `1m` becomes e.g. `20d`. On edit → recomputes **End**. Input that doesn't parse is rejected and the cell reverts. |
-| 7 | **Owner** | Yes | A single owner. Autocomplete from values already present in other rows. |
-| 8 | **Dependencies** | Yes (not on parent rows) | E.g. `3FS` (Finish-Start with ID 3). Types supported in v1: **FS, SS and FF** (SF is out of scope). **Auto-scheduling:** when a dependency is set or edited, the successor's dates are adjusted to the predecessor (preserving its Duration), MS Project style. With several, the latest constraint wins. It also enables the critical path calculation. |
+| 7 | **Dependencies** | Yes (not on parent rows) | E.g. `3FS` (Finish-Start with ID 3). Types supported in v1: **FS, SS and FF** (SF is out of scope). **Auto-scheduling:** when a dependency is set or edited, the successor's dates are adjusted to the predecessor (preserving its Duration), MS Project style. With several, the latest constraint wins. It also enables the critical path calculation. |
+| 8 | **Owner** | Yes | A single owner. Autocomplete from values already present in other rows. |
 
 ### Fields only in the modal (opened from the ID link)
 - **Description:** rich text editor (bold, italic, underline, ordered and unordered lists). **Stored as Markdown**.

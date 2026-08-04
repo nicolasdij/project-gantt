@@ -202,15 +202,8 @@ export function TaskModal() {
             </label>
           </div>
 
+          {/* Mismo orden que el grid: Dependencies antes de Owner. */}
           <div className="field-row">
-            <label className="field">
-              <span>Owner</span>
-              <input
-                className="cell-input"
-                value={draft.owner}
-                onChange={(e) => setField("owner", e.target.value)}
-              />
-            </label>
             <label className="field">
               <span>Dependencies</span>
               {isParent ? (
@@ -223,6 +216,14 @@ export function TaskModal() {
                   onChange={(e) => setField("dependencies", e.target.value)}
                 />
               )}
+            </label>
+            <label className="field">
+              <span>Owner</span>
+              <input
+                className="cell-input"
+                value={draft.owner}
+                onChange={(e) => setField("owner", e.target.value)}
+              />
             </label>
           </div>
 
