@@ -9,7 +9,7 @@ import type { PatchData } from "../api.ts";
 import { useUI } from "../store.ts";
 import { useTasks, useTaskMutations } from "../queries.ts";
 import { MarkdownEditor } from "./MarkdownEditor.tsx";
-import { formatDuration, parseDuration, isoToDate } from "../lib/format.ts";
+import { formatDuration, parseDuration, isoToDate, isoToDisplayDate } from "../lib/format.ts";
 
 // Borrador: todo como string, tal cual se teclea (la Duration se parsea al guardar).
 type Draft = {
@@ -163,7 +163,7 @@ export function TaskModal() {
             <label className="field">
               <span>Start</span>
               {isParent ? (
-                <span className="ro">{draft.start || "—"}</span>
+                <span className="ro">{isoToDisplayDate(draft.start) || "—"}</span>
               ) : (
                 <input
                   type="date"
@@ -176,7 +176,7 @@ export function TaskModal() {
             <label className="field">
               <span>End</span>
               {isParent ? (
-                <span className="ro">{draft.end || "—"}</span>
+                <span className="ro">{isoToDisplayDate(draft.end) || "—"}</span>
               ) : (
                 <input
                   type="date"

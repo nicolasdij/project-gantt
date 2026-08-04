@@ -4,7 +4,7 @@ import type { Task } from "../types.ts";
 import { useUI } from "../store.ts";
 import { useTaskMutations } from "../queries.ts";
 import { EditableText, EditableDate } from "./cells.tsx";
-import { formatDuration, parseDuration, isoToDate, wbsDepth } from "../lib/format.ts";
+import { formatDuration, parseDuration, isoToDate, isoToDisplayDate, wbsDepth } from "../lib/format.ts";
 
 const OWNERS_LIST_ID = "owners-autocomplete";
 
@@ -96,14 +96,14 @@ export function Grid({ tasks }: { tasks: Task[] }) {
                 {/* Start / End / Duration: en padres son calculados (read-only). */}
                 <td className="col-date">
                   {isParent ? (
-                    <span className="ro">{isoToDate(t.start) || "—"}</span>
+                    <span className="ro">{isoToDisplayDate(t.start) || "—"}</span>
                   ) : (
                     <EditableDate value={isoToDate(t.start)} onCommit={(v) => edit(t.id, { start: v })} />
                   )}
                 </td>
                 <td className="col-date">
                   {isParent ? (
-                    <span className="ro">{isoToDate(t.end) || "—"}</span>
+                    <span className="ro">{isoToDisplayDate(t.end) || "—"}</span>
                   ) : (
                     <EditableDate value={isoToDate(t.end)} onCommit={(v) => edit(t.id, { end: v })} />
                   )}

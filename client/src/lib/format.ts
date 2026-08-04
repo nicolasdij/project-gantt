@@ -23,6 +23,16 @@ export function isoToDate(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
+/**
+ * ISO → "dd/mm/yyyy" para las celdas de SOLO LECTURA (fechas de filas padre).
+ * En las filas editables el formato lo dibuja el `input type="date"` del navegador;
+ * esto es para que las filas padre muestren la fecha igual y no en ISO.
+ */
+export function isoToDisplayDate(iso: string | null): string {
+  const [y, m, d] = isoToDate(iso).split("-");
+  return y && m && d ? `${d}/${m}/${y}` : "";
+}
+
 /** "YYYY-MM-DD" + n días de calendario. En UTC, para no depender de la zona horaria. */
 export function addDaysIso(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00.000Z`);

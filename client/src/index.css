@@ -347,6 +347,11 @@ table.grid {
 .num {
   text-align: right;
 }
+/* .ro es flex, así que text-align no alinea su contenido: la celda Duration de una
+   fila padre necesita justify-content para quedar a la derecha como en las hijas. */
+.ro.num {
+  justify-content: flex-end;
+}
 
 .id-link {
   background: none;
