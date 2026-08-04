@@ -48,11 +48,34 @@ export function MarkdownEditor({ value, onChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
+  const LIST_COMMANDS = ["insertUnorderedList", "insertOrderedList"];
+
+  // Al convertir en lista una línea que YA tenía texto, Chrome colapsa la selección
+  // al inicio del <li> recién creado, así que lo próximo que se tipea (o el Enter
+  // para el siguiente bullet) entra ANTES del texto existente. Se recoloca el caret
+  // al final del <li> que lo contiene.
+  const caretToEndOfListItem = () => {
+    const host = ref.current;
+    const sel = window.getSelection();
+    if (!host || !sel || sel.rangeCount === 0) return;
+    const node = sel.anchorNode;
+    if (!node || !host.contains(node)) return;
+    const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+    const li = el?.closest("li");
+    if (!li) return;
+    const range = document.createRange();
+    range.selectNodeContents(li);
+    range.collapse(false); // al final
+    sel.removeAllRanges();
+    sel.addRange(range);
+  };
+
   const exec = (command: string) => {
     // execCommand está deprecado pero es la vía más simple y universal para
     // un WYSIWYG básico; suficiente para el alcance del editor (v1).
     document.execCommand(command, false);
     ref.current?.focus();
+    if (LIST_COMMANDS.includes(command)) caretToEndOfListItem();
   };
 
   const commit = () => {
