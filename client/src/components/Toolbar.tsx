@@ -59,15 +59,9 @@ export function Toolbar() {
         </button>
       </div>
 
+      {/* Outdent a la izquierda e Indent a la derecha: el sentido de cada flecha
+          coincide con su posición en el grupo. */}
       <div className="tb-group">
-        <button
-          className="tb-btn"
-          title="Indent (make child)"
-          onClick={() => hasSel && indent.mutate(selectedId!)}
-          disabled={!hasSel}
-        >
-          ➡️
-        </button>
         <button
           className="tb-btn"
           title="Outdent (move up a level)"
@@ -75,6 +69,14 @@ export function Toolbar() {
           disabled={!hasSel}
         >
           ⬅️
+        </button>
+        <button
+          className="tb-btn"
+          title="Indent (make child)"
+          onClick={() => hasSel && indent.mutate(selectedId!)}
+          disabled={!hasSel}
+        >
+          ➡️
         </button>
       </div>
 

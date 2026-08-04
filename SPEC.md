@@ -86,7 +86,7 @@ Rule applied: **one process per container**. Putting Postgres + Node + Vite in a
 
 ## Toolbar (icon buttons)
 1. ➕ **Add row** · 🗑️ **Delete row**
-2. ➡️ **Indent** · ⬅️ **Outdent**
+2. ⬅️ **Outdent** · ➡️ **Indent**
 3. 🔺 **Move up** · 🔻 **Move down** (reorder)
 4. 🔴 **Toggle critical path**
 5. **Day · Week · Month** (zoom)
