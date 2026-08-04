@@ -72,7 +72,8 @@ Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en u
 - Barras horizontales alineadas con las filas del grid.
 - **Flechas de dependencia** dibujadas tanto en vista normal como en camino crítico (SVG).
 - Milestones como rombo (◆).
-- **Redimensionar barras:** arrastrando el borde **izquierdo** se mueve el Start (el End queda fijo) y arrastrando el **derecho** se mueve el End; en ambos casos la Duration se recalcula. El borde arrastrado se pega al día laborable más cercano (sáb→vie, dom→lun) y frena contra el borde opuesto (mínimo 1 día). No aplica a filas padre (fechas calculadas) ni a milestones (rombos de duración 0).
+- **Arrastrar barras:** desde el **cuerpo** se mueve la tarea completa (Start y End juntos **conservando la Duration**: se manda solo el Start y el motor recalcula el fin); desde el borde **izquierdo** se mueve el Start con el End fijo y desde el **derecho** el End, y en esos dos casos la Duration se recalcula. La fecha resultante se pega al día laborable más cercano (sáb→vie, dom→lun) y, al redimensionar, frena contra el borde opuesto (mínimo 1 día). No aplica a filas padre (fechas calculadas) ni a milestones (rombos de duración 0).
+  - Si la tarea tiene **Dependencies**, el auto-scheduling recalcula su Start desde el predecesor después del arrastre, así que la barra vuelve a su lugar: la dependencia manda (igual que al redimensionar). Para moverla hay que quitar o cambiar la dependencia.
 - Zoom con botones **Day / Week / Month**.
 - Marcador de **"hoy"**.
 - Scroll horizontal (sincronizado con el grid).

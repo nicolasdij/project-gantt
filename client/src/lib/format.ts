@@ -51,6 +51,22 @@ export function snapToWorkingDayIso(iso: string): string {
   return iso;
 }
 
+/**
+ * Avanza `workingDays` días laborables (mismo algoritmo que addWorkingDays del
+ * server). Al mover una barra completa se usa para que el fin del PREVIEW quede
+ * donde el server va a ponerlo al conservar la Duration.
+ */
+export function addWorkingDaysIso(iso: string, workingDays: number): string {
+  let cur = iso;
+  let remaining = workingDays;
+  while (remaining > 0) {
+    cur = addDaysIso(cur, 1);
+    const day = new Date(`${cur}T00:00:00.000Z`).getUTCDay();
+    if (day !== 0 && day !== 6) remaining--;
+  }
+  return cur;
+}
+
 /** Profundidad en el árbol a partir del WBS (1.2.1 → 2). */
 export function wbsDepth(wbs: string): number {
   if (!wbs) return 0;

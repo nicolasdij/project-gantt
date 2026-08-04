@@ -166,6 +166,11 @@ body {
   background: #475569;
   border-radius: 2px;
 }
+/* El cuerpo de la barra se arrastra para mover Start y End juntos (los bordes
+   redimensionan; ver .tl-bar-handle). En los padres no aplica: son roll-up. */
+.tl-bar-draggable {
+  cursor: grab;
+}
 /* Tiradores para redimensionar la barra arrastrando sus bordes laterales.
    Sobresalen 2px hacia afuera para poder agarrarlos en barras angostas. */
 .tl-bar-handle {

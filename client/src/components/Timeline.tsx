@@ -8,19 +8,22 @@ import { useUI } from "../store.ts";
 import { useCriticalPath, useTaskMutations } from "../queries.ts";
 import { parseDependencies } from "../lib/deps.ts";
 import { buildTimeScale } from "../lib/timeScale.ts";
-import { addDaysIso, isoToDate, snapToWorkingDayIso } from "../lib/format.ts";
+import { addDaysIso, addWorkingDaysIso, isoToDate, snapToWorkingDayIso } from "../lib/format.ts";
 import { ROW_H, HEAD_H } from "../lib/layout.ts";
 
 type Geom = { startX: number; endX: number; cy: number; isMilestone: boolean };
 
-// Arrastre de un borde de la barra. Se guardan las fechas originales (no las
-// coordenadas) para que el resultado no dependa del scroll ni del zoom durante el gesto.
+// Arrastre de la barra: un borde (redimensiona) o el cuerpo ("move": desplaza
+// Start y End juntos). Se guardan las fechas originales (no las coordenadas) para
+// que el resultado no dependa del scroll ni del zoom durante el gesto.
+type DragMode = "start" | "end" | "move";
 type Drag = {
   id: number;
-  edge: "start" | "end";
+  mode: DragMode;
   originClientX: number;
   startIso: string;
   endIso: string;
+  durationDays: number; // se conserva al mover la barra completa
 };
 
 // Rombo del milestone: cuadro de lado MS_SIZE rotado 45°. La distancia del centro
@@ -65,26 +68,35 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
     [tasks, preview],
   );
 
-  const onEdgeDown = (e: React.MouseEvent, t: Task, edge: "start" | "end") => {
+  const beginDrag = (e: React.MouseEvent, t: Task, mode: DragMode) => {
     if (!t.start || !t.end) return;
     e.preventDefault();
     e.stopPropagation();
     setDrag({
       id: t.id,
-      edge,
+      mode,
       originClientX: e.clientX,
       startIso: isoToDate(t.start),
       endIso: isoToDate(t.end),
+      durationDays: t.durationDays,
     });
   };
 
   useEffect(() => {
     if (!drag) return;
-    // Días arrastrados → fechas nuevas. El borde queda siempre en día laborable, y se
-    // frena contra el borde opuesto (la barra nunca se invierte: mínimo 1 día).
+    // Días arrastrados → fechas nuevas. La fecha resultante queda siempre en día
+    // laborable. Al redimensionar, el borde frena contra el opuesto (la barra nunca
+    // se invierte: mínimo 1 día); al mover, se conserva la Duration.
     const datesAt = (clientX: number) => {
       const deltaDays = Math.round((clientX - drag.originClientX) / scale.dayWidth);
-      if (drag.edge === "start") {
+      if (drag.mode === "move") {
+        const start = snapToWorkingDayIso(addDaysIso(drag.startIso, deltaDays));
+        // Mismo cálculo que hará el server al conservar la Duration, para que el
+        // preview no muestre un fin distinto del que va a quedar guardado.
+        const end = drag.durationDays <= 0 ? start : addWorkingDaysIso(start, drag.durationDays - 1);
+        return { start, end };
+      }
+      if (drag.mode === "start") {
         const moved = snapToWorkingDayIso(addDaysIso(drag.startIso, deltaDays));
         return { start: moved > drag.endIso ? drag.endIso : moved, end: drag.endIso };
       }
@@ -98,9 +110,13 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
       setDrag(null);
       setPreview(null);
       if (start === drag.startIso && end === drag.endIso) return; // no se movió
-      // Borde izquierdo: se manda start Y end para que el server derive la Duration
-      // (con solo `start` movería el fin conservando la duración). Derecho: solo end.
-      patch.mutate({ id: drag.id, data: drag.edge === "start" ? { start, end } : { end } });
+      // Mover: se manda SOLO start, porque editar el start es justamente el caso en
+      // que el motor conserva la Duration y recalcula el fin.
+      // Borde izquierdo: start Y end, para que derive la Duration (con solo `start`
+      // movería el fin). Borde derecho: solo end.
+      const data =
+        drag.mode === "move" ? { start } : drag.mode === "start" ? { start, end } : { end };
+      patch.mutate({ id: drag.id, data });
     };
 
     window.addEventListener("mousemove", onMove);
@@ -115,7 +131,7 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
   // Cursor/selección global mientras se arrastra (igual que el splitter del layout).
   useEffect(() => {
     document.body.style.userSelect = drag ? "none" : "";
-    document.body.style.cursor = drag ? "ew-resize" : "";
+    document.body.style.cursor = drag ? (drag.mode === "move" ? "grabbing" : "ew-resize") : "";
   }, [drag]);
 
   // Geometría por tarea (índice de fila = posición en el array, ya ordenado).
@@ -279,26 +295,28 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
             }
             const w = Math.max(2, g.endX - g.startX);
             const barH = isParent ? 10 : 18;
-            // Las filas padre tienen fechas calculadas desde los hijos: no se redimensionan.
-            const resizable = !isParent;
+            // Las filas padre tienen fechas calculadas desde los hijos: ni se
+            // redimensionan ni se mueven.
+            const draggable = !isParent;
             return (
               <div
                 key={`bar${t.id}`}
-                className={`tl-bar ${isParent ? "tl-bar-parent" : ""} ${critical ? "tl-critical" : ""}`}
+                className={`tl-bar ${isParent ? "tl-bar-parent" : ""} ${draggable ? "tl-bar-draggable" : ""} ${critical ? "tl-critical" : ""}`}
                 style={{ left: g.startX, top: g.cy - barH / 2, width: w, height: barH }}
-                title={t.title}
+                title={draggable ? `${t.title} — drag to move, drag an edge to resize` : t.title}
+                onMouseDown={draggable ? (e) => beginDrag(e, t, "move") : undefined}
               >
-                {resizable && (
+                {draggable && (
                   <>
                     <span
                       className="tl-bar-handle tl-bar-handle-start"
                       title="Drag to change Start"
-                      onMouseDown={(e) => onEdgeDown(e, t, "start")}
+                      onMouseDown={(e) => beginDrag(e, t, "start")}
                     />
                     <span
                       className="tl-bar-handle tl-bar-handle-end"
                       title="Drag to change End"
-                      onMouseDown={(e) => onEdgeDown(e, t, "end")}
+                      onMouseDown={(e) => beginDrag(e, t, "end")}
                     />
                   </>
                 )}

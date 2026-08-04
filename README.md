@@ -12,7 +12,7 @@ Toda la aplicación corre en **Docker**. Ver [`SPEC.md`](./SPEC.md) para la espe
 - **Roll-up de padres**: Start/End/Duration de las filas resumen se calculan desde sus hijos.
 - **Milestones** (Duration 0) representados como rombo ◆.
 - **Diagrama de Gantt** con barras alineadas a las filas, escala **Day / Week / Month**, marcador de "hoy", flechas de dependencia (SVG) y scroll vertical sincronizado con el grid.
-- **Barras redimensionables**: arrastrando el borde izquierdo se mueve el Start y con el derecho el End (la Duration se recalcula). El borde se pega al día laborable más cercano.
+- **Barras arrastrables**: desde el **cuerpo** se mueve la tarea completa (Start y End juntos, conservando la Duration); desde el borde **izquierdo** se mueve el Start y desde el **derecho** el End (ahí la Duration se recalcula). La fecha resultante se pega al día laborable más cercano.
 - **Modal de detalle** (desde el link del ID) con editor de descripción rich-text guardado como Markdown y botones **Guardar / Cancelar** (el modal no es autosave: descarta si cancelás).
 - Reordenar / indent / outdent / add / delete filas.
 - **Descarte de filas en blanco:** al pasar la selección a otra fila, la que se deja atrás se elimina si quedó totalmente vacía (sin título, fechas, owner, dependencies ni descripción, y con la Duration sin tocar).
