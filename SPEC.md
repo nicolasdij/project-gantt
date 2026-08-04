@@ -8,7 +8,7 @@
 - **Front-end:** React + Vite (TypeScript), state with Zustand/React Query, lightweight Markdown editor.
 - **Back-end:** Node.js + Fastify + Prisma (ORM), REST API.
 - **Database:** PostgreSQL via Docker Compose.
-- **Usage model:** multi-user, autosave (last-write-wins per field), a single project to start with (extensible to several).
+- **Usage model:** multi-user, autosave (last-write-wins per field), a single project to start with (extensible to several). If the server rejects a cell's change (e.g. the `409` for a dependency on an ancestor), the cell reverts to the previous value and the error is shown in a modal — it never keeps showing a value that wasn't saved.
 - **Structure:** monorepo with `/client`, `/server` and `docker-compose.yml`.
 - **Execution:** the whole application runs in Docker (see [Docker architecture](#docker-architecture)).
 

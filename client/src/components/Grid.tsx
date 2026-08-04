@@ -30,8 +30,19 @@ export function Grid({ tasks }: { tasks: Task[] }) {
     [tasks],
   );
 
-  const edit = (id: number, data: Parameters<typeof patch.mutate>[0]["data"]) =>
-    patch.mutate({ id, data });
+  /**
+   * Autosave de una celda. Devuelve `false` si el server RECHAZÓ el cambio (ej. el 409
+   * de una dependencia a un ancestro), para que la celda revierta al valor anterior en
+   * vez de quedarse mostrando algo que no se guardó. El error se sigue mostrando en su
+   * modal (onError de la mutación).
+   */
+  const edit = async (id: number, data: Parameters<typeof patch.mutate>[0]["data"]) => {
+    try {
+      await patch.mutateAsync({ id, data });
+    } catch {
+      return false as const;
+    }
+  };
 
   return (
     <div className="grid-wrap">
@@ -122,7 +133,7 @@ export function Grid({ tasks }: { tasks: Task[] }) {
                         // celda revierte en vez de dejar el texto inválido a la vista.
                         const days = parseDuration(v, daysPerMonth);
                         if (days == null) return false;
-                        edit(t.id, { durationDays: days });
+                        return edit(t.id, { durationDays: days });
                       }}
                     />
                   )}

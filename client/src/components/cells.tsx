@@ -6,11 +6,12 @@ import { formatIsoAs, parseDateInput } from "../lib/format.ts";
 type TextProps = {
   value: string;
   /**
-   * Confirma el valor. Devolver `false` significa RECHAZADO (el valor no se pudo
-   * interpretar): la celda revierte al valor anterior en vez de quedarse mostrando
-   * lo tipeado. Lo usa la celda Duration cuando la entrada no parsea.
+   * Confirma el valor. Devolver `false` significa RECHAZADO: la celda revierte al valor
+   * anterior en vez de quedarse mostrando algo que no se guardó. Puede ser sincrónico
+   * (la celda Duration cuando la entrada no parsea) o una promesa (el autosave cuando
+   * el server rechaza el cambio, ej. el 409 de una dependencia a un ancestro).
    */
-  onCommit: (next: string) => void | boolean;
+  onCommit: (next: string) => void | boolean | Promise<void | boolean>;
   placeholder?: string;
   listId?: string; // para autocomplete (datalist)
   align?: "left" | "right" | "center";
@@ -45,7 +46,15 @@ export function EditableText({
 
   const commit = () => {
     if (draft === value) return;
-    if (onCommit(draft) === false) setDraft(value); // rechazado: revierte
+    const result = onCommit(draft);
+    // `value` acá es el valor previo (el de este render): es justo el que hay que
+    // restaurar, y si el server rechazó sigue siendo el vigente.
+    if (result === false) setDraft(value);
+    else if (result instanceof Promise) {
+      void result.then((ok) => {
+        if (ok === false) setDraft(value);
+      });
+    }
   };
 
   return (
