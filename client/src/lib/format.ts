@@ -23,6 +23,24 @@ export function isoToDate(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
+/** "YYYY-MM-DD" + n días de calendario. En UTC, para no depender de la zona horaria. */
+export function addDaysIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Corre la fecha al día laborable más cercano (sábado → viernes, domingo → lunes).
+ * Se usa al redimensionar barras: el borde arrastrado nunca queda en fin de semana.
+ */
+export function snapToWorkingDayIso(iso: string): string {
+  const day = new Date(`${iso}T00:00:00.000Z`).getUTCDay();
+  if (day === 6) return addDaysIso(iso, -1);
+  if (day === 0) return addDaysIso(iso, 1);
+  return iso;
+}
+
 /** Profundidad en el árbol a partir del WBS (1.2.1 → 2). */
 export function wbsDepth(wbs: string): number {
   if (!wbs) return 0;

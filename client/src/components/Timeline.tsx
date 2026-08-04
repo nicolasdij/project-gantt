@@ -1,15 +1,27 @@
 // Panel derecho: timeline del Gantt. Barras alineadas con las filas del grid,
 // escala Day/Week/Month, marcador "hoy", milestones como rombo y flechas de
 // dependencia (SVG). El scroll vertical se sincroniza con el grid (ver App).
-import { forwardRef, useMemo } from "react";
+// Las barras se redimensionan arrastrando sus bordes laterales (ver `drag`).
+import { forwardRef, useEffect, useMemo, useState } from "react";
 import type { Task } from "../types.ts";
 import { useUI } from "../store.ts";
-import { useCriticalPath } from "../queries.ts";
+import { useCriticalPath, useTaskMutations } from "../queries.ts";
 import { parseDependencies } from "../lib/deps.ts";
 import { buildTimeScale } from "../lib/timeScale.ts";
+import { addDaysIso, isoToDate, snapToWorkingDayIso } from "../lib/format.ts";
 import { ROW_H, HEAD_H } from "../lib/layout.ts";
 
 type Geom = { startX: number; endX: number; cy: number; isMilestone: boolean };
+
+// Arrastre de un borde de la barra. Se guardan las fechas originales (no las
+// coordenadas) para que el resultado no dependa del scroll ni del zoom durante el gesto.
+type Drag = {
+  id: number;
+  edge: "start" | "end";
+  originClientX: number;
+  startIso: string;
+  endIso: string;
+};
 
 // Rombo del milestone: cuadro de lado MS_SIZE rotado 45°. La distancia del centro
 // a cada vértice (izq/der) es la semidiagonal = MS_SIZE * √2 / 2.
@@ -25,10 +37,13 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
   const select = useUI((s) => s.select);
   const showCritical = useUI((s) => s.showCritical);
   const { data: criticalSet } = useCriticalPath(showCritical);
+  const { patch } = useTaskMutations();
   const isCritical = (id: number) => showCritical && !!criticalSet?.has(id);
 
   // "Hoy" en medianoche local; solo para el marcador.
   const today = useMemo(() => new Date(), []);
+  // La escala se construye con las tareas del server (no con el preview del arrastre)
+  // para que el timeline no se re-encuadre debajo del puntero en medio del gesto.
   const scale = useMemo(() => buildTimeScale(tasks, zoom, today), [tasks, zoom, today]);
 
   const parentIds = useMemo(
@@ -36,10 +51,77 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
     [tasks],
   );
 
+  // --- Redimensionar barras arrastrando los bordes ---
+  const [drag, setDrag] = useState<Drag | null>(null);
+  // Fechas provisorias mientras se arrastra (la barra sigue al puntero sin ir al server).
+  const [preview, setPreview] = useState<{ id: number; start: string; end: string } | null>(null);
+
+  // Filas a dibujar: las del server, con el preview aplicado a la que se arrastra.
+  const rows = useMemo(
+    () =>
+      preview
+        ? tasks.map((t) => (t.id === preview.id ? { ...t, start: preview.start, end: preview.end } : t))
+        : tasks,
+    [tasks, preview],
+  );
+
+  const onEdgeDown = (e: React.MouseEvent, t: Task, edge: "start" | "end") => {
+    if (!t.start || !t.end) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDrag({
+      id: t.id,
+      edge,
+      originClientX: e.clientX,
+      startIso: isoToDate(t.start),
+      endIso: isoToDate(t.end),
+    });
+  };
+
+  useEffect(() => {
+    if (!drag) return;
+    // Días arrastrados → fechas nuevas. El borde queda siempre en día laborable, y se
+    // frena contra el borde opuesto (la barra nunca se invierte: mínimo 1 día).
+    const datesAt = (clientX: number) => {
+      const deltaDays = Math.round((clientX - drag.originClientX) / scale.dayWidth);
+      if (drag.edge === "start") {
+        const moved = snapToWorkingDayIso(addDaysIso(drag.startIso, deltaDays));
+        return { start: moved > drag.endIso ? drag.endIso : moved, end: drag.endIso };
+      }
+      const moved = snapToWorkingDayIso(addDaysIso(drag.endIso, deltaDays));
+      return { start: drag.startIso, end: moved < drag.startIso ? drag.startIso : moved };
+    };
+
+    const onMove = (ev: MouseEvent) => setPreview({ id: drag.id, ...datesAt(ev.clientX) });
+    const onUp = (ev: MouseEvent) => {
+      const { start, end } = datesAt(ev.clientX);
+      setDrag(null);
+      setPreview(null);
+      if (start === drag.startIso && end === drag.endIso) return; // no se movió
+      // Borde izquierdo: se manda start Y end para que el server derive la Duration
+      // (con solo `start` movería el fin conservando la duración). Derecho: solo end.
+      patch.mutate({ id: drag.id, data: drag.edge === "start" ? { start, end } : { end } });
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag, scale.dayWidth]);
+
+  // Cursor/selección global mientras se arrastra (igual que el splitter del layout).
+  useEffect(() => {
+    document.body.style.userSelect = drag ? "none" : "";
+    document.body.style.cursor = drag ? "ew-resize" : "";
+  }, [drag]);
+
   // Geometría por tarea (índice de fila = posición en el array, ya ordenado).
   const geom = useMemo(() => {
     const map = new Map<number, Geom>();
-    tasks.forEach((t, i) => {
+    rows.forEach((t, i) => {
       const cy = i * ROW_H + ROW_H / 2;
       if (!t.start || !t.end) {
         map.set(t.id, { startX: 0, endX: 0, cy, isMilestone: t.isMilestone });
@@ -63,7 +145,7 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
       map.set(t.id, { startX, endX, cy, isMilestone: false });
     });
     return map;
-  }, [tasks, scale]);
+  }, [rows, scale]);
 
   const bodyHeight = tasks.length * ROW_H;
 
@@ -174,7 +256,7 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
           )}
 
           {/* Barras / milestones */}
-          {tasks.map((t) => {
+          {rows.map((t) => {
             const g = geom.get(t.id)!;
             if (!t.start || !t.end) return null;
             const isParent = parentIds.has(t.id);
@@ -193,13 +275,30 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
             }
             const w = Math.max(2, g.endX - g.startX);
             const barH = isParent ? 10 : 18;
+            // Las filas padre tienen fechas calculadas desde los hijos: no se redimensionan.
+            const resizable = !isParent;
             return (
               <div
                 key={`bar${t.id}`}
                 className={`tl-bar ${isParent ? "tl-bar-parent" : ""} ${critical ? "tl-critical" : ""}`}
                 style={{ left: g.startX, top: g.cy - barH / 2, width: w, height: barH }}
                 title={t.title}
-              />
+              >
+                {resizable && (
+                  <>
+                    <span
+                      className="tl-bar-handle tl-bar-handle-start"
+                      title="Drag to change Start"
+                      onMouseDown={(e) => onEdgeDown(e, t, "start")}
+                    />
+                    <span
+                      className="tl-bar-handle tl-bar-handle-end"
+                      title="Drag to change End"
+                      onMouseDown={(e) => onEdgeDown(e, t, "end")}
+                    />
+                  </>
+                )}
+              </div>
             );
           })}
 

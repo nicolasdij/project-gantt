@@ -71,6 +71,7 @@ Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en u
 - Barras horizontales alineadas con las filas del grid.
 - **Flechas de dependencia** dibujadas tanto en vista normal como en camino crítico (SVG).
 - Milestones como rombo (◆).
+- **Redimensionar barras:** arrastrando el borde **izquierdo** se mueve el Start (el End queda fijo) y arrastrando el **derecho** se mueve el End; en ambos casos la Duration se recalcula. El borde arrastrado se pega al día laborable más cercano (sáb→vie, dom→lun) y frena contra el borde opuesto (mínimo 1 día). No aplica a filas padre (fechas calculadas) ni a milestones (rombos de duración 0).
 - Zoom con botones **Day / Week / Month**.
 - Marcador de **"hoy"**.
 - Scroll horizontal (sincronizado con el grid).

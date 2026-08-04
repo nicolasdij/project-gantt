@@ -166,6 +166,25 @@ body {
   background: #475569;
   border-radius: 2px;
 }
+/* Tiradores para redimensionar la barra arrastrando sus bordes laterales.
+   Sobresalen 2px hacia afuera para poder agarrarlos en barras angostas. */
+.tl-bar-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  border-radius: 3px;
+}
+.tl-bar-handle-start {
+  left: -2px;
+}
+.tl-bar-handle-end {
+  right: -2px;
+}
+.tl-bar:hover .tl-bar-handle {
+  background: rgba(255, 255, 255, 0.55);
+}
 .tl-milestone {
   position: absolute;
   background: var(--milestone);
