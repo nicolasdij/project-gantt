@@ -2,7 +2,7 @@
 // escala Day/Week/Month, marcador "hoy", milestones como rombo y flechas de
 // dependencia (SVG). El scroll vertical se sincroniza con el grid (ver App).
 // Las barras se redimensionan arrastrando sus bordes laterales (ver `drag`).
-import { forwardRef, useEffect, useMemo, useState } from "react";
+import { forwardRef, memo, useEffect, useMemo, useState } from "react";
 import type { Task } from "../types.ts";
 import { useUI } from "../store.ts";
 import { useCriticalPath, useTaskMutations } from "../queries.ts";
@@ -31,7 +31,7 @@ type Drag = {
 const MS_SIZE = ROW_H / 2;
 const MS_HALF_DIAG = MS_SIZE * Math.SQRT1_2;
 
-export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Timeline(
+const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Timeline(
   { tasks },
   ref,
 ) {
@@ -358,3 +358,10 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
     </div>
   );
 });
+
+// memo: su única prop es `tasks` (referencia estable de react-query), así que el panel
+// no se vuelve a dibujar cuando App re-renderiza por otra cosa — en particular durante
+// un arrastre del divisor o del ancho de una columna, que dispara un render por cada
+// movimiento del mouse. Lo que sí lo actualiza (zoom, selección, camino crítico) llega
+// por el store, y eso el memo no lo bloquea.
+export const Timeline = memo(TimelineImpl);

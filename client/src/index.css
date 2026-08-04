@@ -444,12 +444,6 @@ table.grid {
   align-items: center;
   gap: 4px;
   height: 30px;
-  /* min-width 0 (acá y en el input): sin esto el ancho mínimo del input impide que la
-     columna Title se pueda achicar por debajo de él. */
-  min-width: 0;
-}
-.title-cell .cell-input {
-  min-width: 0;
 }
 .milestone-mark {
   color: var(--milestone);
@@ -474,7 +468,6 @@ table.grid {
 }
 .date-cell .cell-input {
   flex: 1;
-  min-width: 0;
 }
 .date-picker-btn {
   border: none;
@@ -503,6 +496,10 @@ table.grid {
 /* Inputs de celda: ocupan toda la celda, sin borde salvo al enfocar. */
 .cell-input {
   width: 100%;
+  /* Dentro de las celdas que son flex (title, date) el input es un flex item, y ahí
+     `min-width: auto` equivale a su ancho mínimo intrínseco: sin esto la columna no
+     se puede achicar por debajo de él (se nota al arrastrar el ancho de Title). */
+  min-width: 0;
   height: 30px;
   line-height: 28px;
   border: 1px solid transparent;

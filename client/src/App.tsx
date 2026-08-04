@@ -24,19 +24,22 @@ const DEFAULT_TITLE = 240;
 /** Deja al panel izquierdo un ancho válido: ni él ni el derecho bajan de MIN_GRID. */
 const clampPanel = (w: number) => Math.max(MIN_GRID, Math.min(w, window.innerWidth - MIN_GRID));
 
-/** Ancho del contenido del grid hasta el borde derecho de Duration (incluida). */
-function widthThroughDuration(panel: HTMLDivElement): number | null {
+/**
+ * Ancho inicial del panel izquierdo: hasta el borde derecho de la columna marcada con
+ * `data-panel-edge` en el grid (hoy Duration). Si no está, cae al ancho natural.
+ */
+function initialPanelWidth(panel: HTMLElement): number {
   const table = panel.querySelector("table.grid");
-  const dur = panel.querySelector("thead th.col-dur");
-  if (!table || !dur) return null;
+  const edge = panel.querySelector("thead th[data-panel-edge]");
+  if (!table || !edge) return panel.scrollWidth;
   // Rects y no offsetLeft: offsetLeft es relativo al offsetParent (que acá depende de
   // qué ancestro esté posicionado), mientras que la diferencia de rects es siempre la
   // distancia real. Se mide con scrollLeft en 0, así que la columna ID pegada no está
   // desplazada. Incluye los bordes de las celdas; +1 para no cortar el último.
-  const content = dur.getBoundingClientRect().right - table.getBoundingClientRect().left + 1;
+  const content = edge.getBoundingClientRect().right - table.getBoundingClientRect().left + 1;
   // El ancho del panel incluye su barra de scroll vertical, que no es área útil: sin
-  // sumarla, Duration queda tapada por la barra. Con scrollbars superpuestas (macOS)
-  // la diferencia es 0 y no suma nada.
+  // sumarla, la última columna queda tapada por la barra. Con scrollbars superpuestas
+  // (macOS) la diferencia es 0 y no suma nada.
   return content + (panel.offsetWidth - panel.clientWidth);
 }
 
@@ -47,71 +50,64 @@ export default function App() {
   const gridRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
-  // Ancho de la columna Title (px). Se arrastra desde el borde de su cabecera.
+  // Los dos anchos son estado de la sesión a propósito: no se guardan en localStorage
+  // como el resto de las preferencias (ver store.ts). El del panel se recalcula en cada
+  // carga, que es justo lo que mantiene la vista inicial "hasta Duration".
   const [titleWidth, setTitleWidth] = useState(DEFAULT_TITLE);
 
   // Ancho del panel izquierdo (px). null hasta medirlo sobre el DOM ya renderizado.
   const [gridWidth, setGridWidth] = useState<number | null>(null);
   useLayoutEffect(() => {
     if (gridWidth != null || !tasks || !gridRef.current) return;
-    // Ancho inicial = hasta Duration, no el natural de la tabla: Dependencies y Owner
-    // quedan fuera de vista (se llega a ellas con el scroll horizontal del panel o
-    // corriendo el divisor) y ese ancho se lo queda el Gantt, que es lo que se mira.
-    const w = widthThroughDuration(gridRef.current) ?? gridRef.current.scrollWidth;
-    setGridWidth(clampPanel(w));
+    // Dependencies y Owner quedan fuera de vista (se llega a ellas con el scroll
+    // horizontal del panel o corriendo el divisor) y ese ancho se lo queda el Gantt.
+    setGridWidth(clampPanel(initialPanelWidth(gridRef.current)));
   }, [tasks, gridWidth]);
 
   // --- Arrastre: divisor de paneles y borde de la columna Title ---
-  const drag = useRef<{
-    kind: "panel" | "title";
-    startX: number;
-    startPanel: number;
-    startTitle: number;
-  } | null>(null);
-  // Qué se está arrastrando (o null): es estado, no solo el ref, porque de esto
-  // dependen el cursor global y el resaltado del agarre.
+  // `dragging` (qué se arrastra, o null) es el único estado del gesto: de él dependen
+  // el cursor global, el resaltado del agarre y los listeners. El ref guarda solo los
+  // valores de partida, que se leen en cada mousemove pero no re-renderizan nada.
   const [dragging, setDragging] = useState<"panel" | "title" | null>(null);
+  const start = useRef({ x: 0, panel: 0, title: 0 });
 
   const startDrag = (kind: "panel" | "title") => (e: React.MouseEvent) => {
-    drag.current = {
-      kind,
-      startX: e.clientX,
-      startPanel: gridWidth ?? gridRef.current?.offsetWidth ?? 0,
-      startTitle: titleWidth,
+    start.current = {
+      x: e.clientX,
+      panel: gridWidth ?? gridRef.current?.offsetWidth ?? 0,
+      title: titleWidth,
     };
     setDragging(kind);
     e.preventDefault();
   };
 
-  useEffect(() => {
+  // Los listeners existen solo mientras se arrastra. useLayoutEffect y no useEffect:
+  // se suscribe en el mismo tick que el mousedown, así un click muy corto (mouseup en
+  // el mismo frame) no queda con el arrastre colgado.
+  useLayoutEffect(() => {
+    if (!dragging) return;
     const onMove = (e: MouseEvent) => {
-      const d = drag.current;
-      if (!d) return;
-      const dx = e.clientX - d.startX;
-      if (d.kind === "panel") {
-        setGridWidth(clampPanel(d.startPanel + dx));
+      const s = start.current;
+      const dx = e.clientX - s.x;
+      if (dragging === "panel") {
+        setGridWidth(clampPanel(s.panel + dx));
         return;
       }
       // Title: el panel acompaña el mismo delta, así las columnas que estaban a la
       // vista siguen estándolo (ensanchar Title no empuja Duration fuera del panel).
       // Si el panel ya está en su tope, deja de crecer y el grid pasa a scrollear.
-      const next = Math.max(MIN_TITLE, d.startTitle + dx);
+      const next = Math.max(MIN_TITLE, s.title + dx);
       setTitleWidth(next);
-      setGridWidth(clampPanel(d.startPanel + (next - d.startTitle)));
+      setGridWidth(clampPanel(s.panel + (next - s.title)));
     };
-    const onUp = () => {
-      if (drag.current) {
-        drag.current = null;
-        setDragging(null);
-      }
-    };
+    const onUp = () => setDragging(null);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, []);
+  }, [dragging]);
 
   // Cursor/selección global mientras se arrastra.
   useEffect(() => {

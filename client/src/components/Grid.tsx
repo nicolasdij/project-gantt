@@ -80,7 +80,13 @@ export function Grid({ tasks, titleWidth, onTitleResizeStart, titleResizing }: G
             </th>
             <th className="col-date">Start</th>
             <th className="col-date">End</th>
-            <th className="col-dur">Duration</th>
+            {/* data-panel-edge: hasta acá llega el panel izquierdo al cargar la página
+                (App mide el borde derecho de esta celda). El atributo va donde se
+                definen las columnas para que mover o renombrar una no rompa la medición
+                en silencio; si querés otro corte, movelo a esa columna. */}
+            <th className="col-dur" data-panel-edge>
+              Duration
+            </th>
             <th className="col-deps">Dependencies</th>
             <th className="col-owner">Owner</th>
           </tr>
