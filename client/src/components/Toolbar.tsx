@@ -9,6 +9,7 @@ import { ConfirmDialog } from "./ConfirmDialog.tsx";
 export function Toolbar() {
   const selectedId = useUI((s) => s.selectedId);
   const select = useUI((s) => s.select);
+  const requestTitleFocus = useUI((s) => s.requestTitleFocus);
   const zoom = useUI((s) => s.zoom);
   const setZoom = useUI((s) => s.setZoom);
   const showCritical = useUI((s) => s.showCritical);
@@ -25,7 +26,14 @@ export function Toolbar() {
   const addRow = () =>
     create.mutate(
       { afterId: selectedId ?? undefined },
-      { onSuccess: (task) => select(task.id) },
+      {
+        // Se selecciona la fila nueva y se pide el foco para su celda Title: la celda
+        // lo toma cuando la fila llega en el refetch (ver focusTitleId en el store).
+        onSuccess: (task) => {
+          select(task.id);
+          requestTitleFocus(task.id);
+        },
+      },
     );
 
   const confirmDelete = () => {

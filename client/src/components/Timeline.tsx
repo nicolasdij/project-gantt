@@ -76,7 +76,8 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
   // Flechas de dependencia.
   const arrows = useMemo(() => {
     const paths: { d: string; key: string }[] = [];
-    const stub = 10;
+    const stub = 10; // saliente desde el borde de la barra
+    const entry = 6; // tramo horizontal mínimo de entrada (da dirección a la punta)
     for (const t of tasks) {
       const succ = geom.get(t.id);
       if (!succ || (!t.start && !t.end)) continue;
@@ -107,9 +108,16 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
           // Une los INICIOS (bordes izquierdos): enruta por FUERA, a la izquierda de ambas barras.
           const goLeft = Math.min(x1, x2) - stub;
           d = `M ${x1} ${y1} H ${goLeft} V ${y2} H ${x2}`;
-        } else {
-          // FS: sale del fin del predecesor (derecha) hacia el inicio del sucesor (izquierda).
+        } else if (x2 >= x1 + stub + entry) {
+          // FS con espacio: sale del fin del predecesor (derecha), baja, y entra al
+          // inicio del sucesor por la IZQUIERDA (o sea, por fuera de la barra).
           d = `M ${x1} ${y1} H ${x1 + stub} V ${y2} H ${x2}`;
+        } else {
+          // FS sin espacio (el sucesor arranca donde termina el predecesor, o antes):
+          // hay que rodear. Si se bajara en línea recta, el último tramo iría de
+          // derecha a izquierda y la punta entraría por DENTRO de la barra del sucesor.
+          const midY = (y1 + y2) / 2; // entre las dos filas
+          d = `M ${x1} ${y1} H ${x1 + stub} V ${midY} H ${x2 - entry} V ${y2} H ${x2}`;
         }
         paths.push({ d, key: `${dep.predId}-${t.id}-${dep.type}` });
       }
@@ -198,10 +206,12 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
           {/* Flechas de dependencia */}
           <svg className="tl-arrows" width={scale.width} height={bodyHeight}>
             <defs>
+              {/* refX = 8 es la punta del triángulo: así la punta cae EXACTAMENTE en
+                  el borde de la barra (con refX 7 se metía ~1px hacia adentro). */}
               <marker
                 id="dep-arrow"
                 viewBox="0 0 8 8"
-                refX="7"
+                refX="8"
                 refY="4"
                 markerWidth="7"
                 markerHeight="7"

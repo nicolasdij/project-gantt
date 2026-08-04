@@ -561,6 +561,16 @@ table.grid {
 .md-btn:hover {
   background: var(--bg-hover);
 }
+/* Estado "on": el comando está activo en la selección actual. */
+.md-btn.md-btn-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.md-btn.md-btn-active:hover {
+  background: var(--accent);
+  filter: brightness(0.95);
+}
 .md-sep {
   width: 1px;
   height: 18px;

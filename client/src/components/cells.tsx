@@ -7,11 +7,34 @@ type TextProps = {
   placeholder?: string;
   listId?: string; // para autocomplete (datalist)
   align?: "left" | "right" | "center";
+  // Toma el foco (y selecciona el contenido) en cuanto pasa a true. Lo usa la
+  // celda Title de una fila recién creada; `onAutoFocused` avisa para bajar el pedido.
+  autoFocus?: boolean;
+  onAutoFocused?: () => void;
 };
 
-export function EditableText({ value, onCommit, placeholder, listId, align = "left" }: TextProps) {
+export function EditableText({
+  value,
+  onCommit,
+  placeholder,
+  listId,
+  align = "left",
+  autoFocus = false,
+  onAutoFocused,
+}: TextProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+    onAutoFocused?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFocus]);
 
   const commit = () => {
     if (draft !== value) onCommit(draft);
@@ -19,6 +42,7 @@ export function EditableText({ value, onCommit, placeholder, listId, align = "le
 
   return (
     <input
+      ref={inputRef}
       className="cell-input"
       style={{ textAlign: align }}
       value={draft}

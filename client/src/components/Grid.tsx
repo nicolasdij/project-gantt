@@ -12,6 +12,8 @@ export function Grid({ tasks }: { tasks: Task[] }) {
   const selectedId = useUI((s) => s.selectedId);
   const select = useUI((s) => s.select);
   const openModal = useUI((s) => s.openModal);
+  const focusTitleId = useUI((s) => s.focusTitleId);
+  const clearTitleFocus = useUI((s) => s.clearTitleFocus);
   const { patch } = useTaskMutations();
 
   // Ids que son padres (tienen al menos un hijo): sus fechas son calculadas.
@@ -82,7 +84,12 @@ export function Grid({ tasks }: { tasks: Task[] }) {
                 <td className="col-title">
                   <div style={{ paddingLeft: depth * 18 }} className="title-cell">
                     {t.isMilestone && <span className="milestone-mark">◆</span>}
-                    <EditableText value={t.title} onCommit={(v) => edit(t.id, { title: v })} />
+                    <EditableText
+                      value={t.title}
+                      onCommit={(v) => edit(t.id, { title: v })}
+                      autoFocus={focusTitleId === t.id}
+                      onAutoFocused={clearTitleFocus}
+                    />
                   </div>
                 </td>
 
