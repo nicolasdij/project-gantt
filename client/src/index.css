@@ -369,8 +369,35 @@ table.grid {
 .col-wbs {
   width: 64px;
 }
-.col-title {
-  min-width: 240px;
+/* Title: el ancho lo pone App en línea sobre el <th> (columna redimensionable), así
+   que acá no se declara ninguno. */
+
+/* Agarre para redimensionar una columna: franja invisible pegada al borde derecho de
+   la cabecera, con una guía fina que se marca al pasar el mouse.
+   Queda DENTRO de su celda (no se monta sobre la de al lado): las cabeceras son
+   sticky con el mismo z-index, así que la de la derecha gana el hit-testing por estar
+   después en el DOM y se comería la parte que sobresaliera. */
+.col-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -1px; /* -1 para llegar hasta el borde de la celda, sin pasarlo */
+  width: 9px;
+  cursor: col-resize;
+}
+.col-resizer::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  right: 0;
+  width: 1px;
+  background: var(--border-strong);
+}
+.col-resizer:hover::after,
+.col-resizer.dragging::after {
+  width: 3px;
+  background: var(--accent);
 }
 .col-date {
   width: 130px;
@@ -417,6 +444,12 @@ table.grid {
   align-items: center;
   gap: 4px;
   height: 30px;
+  /* min-width 0 (acá y en el input): sin esto el ancho mínimo del input impide que la
+     columna Title se pueda achicar por debajo de él. */
+  min-width: 0;
+}
+.title-cell .cell-input {
+  min-width: 0;
 }
 .milestone-mark {
   color: var(--milestone);

@@ -3,6 +3,11 @@
 // controlado (px): se ajusta arrastrando el divisor y se MANTIENE al redimensionar
 // la ventana; el panel derecho absorbe el cambio de ancho (con scroll horizontal
 // interno si su contenido es más ancho). El scroll vertical de ambos va sincronizado.
+//
+// Acá viven los DOS anchos arrastrables, porque se afectan entre sí: el del panel y
+// el de la columna Title. Los gestos son iguales (mousedown + mousemove global) y
+// comparten el mismo estado de arrastre, así el ancho de partida se toma una sola vez
+// al empezar y nunca se calcula sobre un valor de un render anterior.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTasks, useDiscardEmptyRowOnLeave } from "./queries.ts";
 import { Toolbar } from "./components/Toolbar.tsx";
@@ -13,6 +18,27 @@ import { SettingsModal } from "./components/SettingsModal.tsx";
 import { NoticeModal } from "./components/NoticeModal.tsx";
 
 const MIN_GRID = 240; // ancho mínimo de cada panel al arrastrar
+const MIN_TITLE = 120; // ancho mínimo de la columna Title
+const DEFAULT_TITLE = 240;
+
+/** Deja al panel izquierdo un ancho válido: ni él ni el derecho bajan de MIN_GRID. */
+const clampPanel = (w: number) => Math.max(MIN_GRID, Math.min(w, window.innerWidth - MIN_GRID));
+
+/** Ancho del contenido del grid hasta el borde derecho de Duration (incluida). */
+function widthThroughDuration(panel: HTMLDivElement): number | null {
+  const table = panel.querySelector("table.grid");
+  const dur = panel.querySelector("thead th.col-dur");
+  if (!table || !dur) return null;
+  // Rects y no offsetLeft: offsetLeft es relativo al offsetParent (que acá depende de
+  // qué ancestro esté posicionado), mientras que la diferencia de rects es siempre la
+  // distancia real. Se mide con scrollLeft en 0, así que la columna ID pegada no está
+  // desplazada. Incluye los bordes de las celdas; +1 para no cortar el último.
+  const content = dur.getBoundingClientRect().right - table.getBoundingClientRect().left + 1;
+  // El ancho del panel incluye su barra de scroll vertical, que no es área útil: sin
+  // sumarla, Duration queda tapada por la barra. Con scrollbars superpuestas (macOS)
+  // la diferencia es 0 y no suma nada.
+  return content + (panel.offsetWidth - panel.clientWidth);
+}
 
 export default function App() {
   const { data: tasks, isLoading, isError, error } = useTasks();
@@ -21,36 +47,62 @@ export default function App() {
   const gridRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
-  // Ancho del panel izquierdo (px). null hasta medir el ancho natural (todas las columnas).
+  // Ancho de la columna Title (px). Se arrastra desde el borde de su cabecera.
+  const [titleWidth, setTitleWidth] = useState(DEFAULT_TITLE);
+
+  // Ancho del panel izquierdo (px). null hasta medirlo sobre el DOM ya renderizado.
   const [gridWidth, setGridWidth] = useState<number | null>(null);
   useLayoutEffect(() => {
-    if (gridWidth == null && tasks && gridRef.current) {
-      setGridWidth(gridRef.current.scrollWidth);
-    }
+    if (gridWidth != null || !tasks || !gridRef.current) return;
+    // Ancho inicial = hasta Duration, no el natural de la tabla: Dependencies y Owner
+    // quedan fuera de vista (se llega a ellas con el scroll horizontal del panel o
+    // corriendo el divisor) y ese ancho se lo queda el Gantt, que es lo que se mira.
+    const w = widthThroughDuration(gridRef.current) ?? gridRef.current.scrollWidth;
+    setGridWidth(clampPanel(w));
   }, [tasks, gridWidth]);
 
-  // --- Arrastre del splitter ---
-  const drag = useRef<{ startX: number; startW: number } | null>(null);
-  const [dragging, setDragging] = useState(false);
+  // --- Arrastre: divisor de paneles y borde de la columna Title ---
+  const drag = useRef<{
+    kind: "panel" | "title";
+    startX: number;
+    startPanel: number;
+    startTitle: number;
+  } | null>(null);
+  // Qué se está arrastrando (o null): es estado, no solo el ref, porque de esto
+  // dependen el cursor global y el resaltado del agarre.
+  const [dragging, setDragging] = useState<"panel" | "title" | null>(null);
 
-  const onSplitterDown = (e: React.MouseEvent) => {
-    const startW = gridWidth ?? gridRef.current?.offsetWidth ?? 0;
-    drag.current = { startX: e.clientX, startW };
-    setDragging(true);
+  const startDrag = (kind: "panel" | "title") => (e: React.MouseEvent) => {
+    drag.current = {
+      kind,
+      startX: e.clientX,
+      startPanel: gridWidth ?? gridRef.current?.offsetWidth ?? 0,
+      startTitle: titleWidth,
+    };
+    setDragging(kind);
     e.preventDefault();
   };
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      if (!drag.current) return;
-      const raw = drag.current.startW + (e.clientX - drag.current.startX);
-      const max = window.innerWidth - MIN_GRID;
-      setGridWidth(Math.max(MIN_GRID, Math.min(raw, max)));
+      const d = drag.current;
+      if (!d) return;
+      const dx = e.clientX - d.startX;
+      if (d.kind === "panel") {
+        setGridWidth(clampPanel(d.startPanel + dx));
+        return;
+      }
+      // Title: el panel acompaña el mismo delta, así las columnas que estaban a la
+      // vista siguen estándolo (ensanchar Title no empuja Duration fuera del panel).
+      // Si el panel ya está en su tope, deja de crecer y el grid pasa a scrollear.
+      const next = Math.max(MIN_TITLE, d.startTitle + dx);
+      setTitleWidth(next);
+      setGridWidth(clampPanel(d.startPanel + (next - d.startTitle)));
     };
     const onUp = () => {
       if (drag.current) {
         drag.current = null;
-        setDragging(false);
+        setDragging(null);
       }
     };
     window.addEventListener("mousemove", onMove);
@@ -103,14 +155,21 @@ export default function App() {
         <section className="panel panel-grid" ref={gridRef} style={gridStyle}>
           {isLoading && <p className="state">Loading…</p>}
           {isError && <p className="state error">Error: {(error as Error)?.message}</p>}
-          {tasks && <Grid tasks={tasks} />}
+          {tasks && (
+            <Grid
+              tasks={tasks}
+              titleWidth={titleWidth}
+              onTitleResizeStart={startDrag("title")}
+              titleResizing={dragging === "title"}
+            />
+          )}
         </section>
 
         {tasks && (
           <>
             <div
-              className={`splitter ${dragging ? "dragging" : ""}`}
-              onMouseDown={onSplitterDown}
+              className={`splitter ${dragging === "panel" ? "dragging" : ""}`}
+              onMouseDown={startDrag("panel")}
               role="separator"
               aria-orientation="vertical"
               title="Drag to resize"

@@ -40,13 +40,15 @@ Rule applied: **one process per container**. Putting Postgres + Node + Vite in a
 - Toolbar on top.
 - Left panel: grid of rows/columns (editable). The **ID** column is frozen: scrolling horizontally moves the other columns under it. The header row is frozen the same way vertically.
 - Right panel: the Gantt timeline (horizontal bars, dependency arrows).
+- **Panel widths.** The divider between the two is draggable, and neither panel goes below 240px. On load (and on every reload) the left panel is **as wide as it needs to be to show up to Duration**, measured on the rendered grid — not the width of the whole table: **Dependencies** and **Owner** are left out of view on purpose, and that width goes to the Gantt, which is what the view is for. Those two columns are reached by scrolling the panel horizontally or by moving the divider.
+- **The Title column is resizable** by dragging the right edge of its header (minimum 120px). The panel follows the same delta, so widening Title does not push Duration out of view; once the panel hits its limit it stops growing and the grid scrolls instead. Neither width is persisted: both are recomputed on reload, which is what keeps "up to Duration" true at every start.
 
 ## Left panel columns (in this order)
 | # | Column | Editable | Notes |
 |---|--------|----------|-------|
 | 1 | **ID** | No (autogen) | Sequential number, MS Project style. Used in Dependencies. It is a **link**: clicking it opens the edit modal. **Frozen column:** it stays in place when the left panel is scrolled horizontally. |
 | 2 | **WBS** | No (autogen) | Hierarchical (1, 1.1, 1.2.1). Text (not editable). |
-| 3 | **Title** | Yes | Short title of the item. |
+| 3 | **Title** | Yes | Short title of the item. **Resizable column:** dragging the right edge of its header changes its width (see [App layout](#app-layout)). |
 | 4 | **Start Date** | Yes | Rendered in the format chosen in **Settings**. On edit → recomputes **End** (from Duration, skipping weekends). |
 | 5 | **End Date** | Yes | Rendered in the format chosen in **Settings**. On edit → recomputes **Duration**. |
 | 6 | **Duration** | Yes | `Nd` / `Nw` / `Nm` (a bare number means days). `1w` = 5 working days; `1m` = the working days per month set in **Settings**. Always stored and displayed in days, so `1m` becomes e.g. `20d`. On edit → recomputes **End**. Input that doesn't parse is rejected and the cell reverts. |
@@ -130,4 +132,5 @@ Configures app behaviour. Same pattern as the detail modal: changes live in a lo
 8. **Dependencies are not accepted on parent rows:** the scheduler only schedules leaves (a parent's dates are roll-up), so a dependency on a parent scheduled nothing and only drew a misleading arrow. The cell is now read-only (in the grid and in the modal), the API answers `409`, and the Gantt does not draw the arrow. A parent row **can** be a predecessor. If a leaf with dependencies becomes a parent (by indenting), the stored value stays visible but inert. ✅
 9. **Settings in `localStorage`, not in the database:** the date format and the working days per month are UI preferences — see the [Settings](#settings--popup-in-the-toolbar) section. The editable Start/End cells stopped being `input type="date"` because that control's format comes from the browser locale; they are now text inputs in the chosen format plus a button that opens the native picker. ✅
 10. **Cycles are rejected at the edge and ignored by the engines:** the API validates with a single predicate — the dependency `succ ← pred` closes a cycle ⇔ `pred` is already downstream of `succ` following dependency and roll-up edges. The same predicate is what both engines use to skip those edges, so the scheduler and the CPM see the same graph. ✅
-11. **Detail modal = form, not autosave:** the ID popup has **Save** (sends the modified fields in a single PATCH and closes) and **Cancel** (closes discarding) buttons. ✕, Escape and clicking the backdrop are equivalent to Cancel. The grid remains autosave per cell. ✅
+11. **The initial panel width is measured, not hardcoded:** it is taken from the right edge of the Duration header on the rendered grid, plus the width of the panel's vertical scrollbar (without that, the scrollbar covered Duration; with overlay scrollbars it adds nothing). Measuring instead of adding up constants means the value stays right when a column changes width — including the Title column the user just dragged. ✅
+12. **Detail modal = form, not autosave:** the ID popup has **Save** (sends the modified fields in a single PATCH and closes) and **Cancel** (closes discarding) buttons. ✕, Escape and clicking the backdrop are equivalent to Cancel. The grid remains autosave per cell. ✅

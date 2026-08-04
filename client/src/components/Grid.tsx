@@ -8,7 +8,15 @@ import { formatDuration, parseDuration, isoToDate, formatIsoAs, wbsDepth } from 
 
 const OWNERS_LIST_ID = "owners-autocomplete";
 
-export function Grid({ tasks }: { tasks: Task[] }) {
+type GridProps = {
+  tasks: Task[];
+  /** Ancho de la columna Title (px). Lo administra App, que también mueve el panel. */
+  titleWidth: number;
+  onTitleResizeStart: (e: React.MouseEvent) => void;
+  titleResizing: boolean;
+};
+
+export function Grid({ tasks, titleWidth, onTitleResizeStart, titleResizing }: GridProps) {
   const selectedId = useUI((s) => s.selectedId);
   const select = useUI((s) => s.select);
   const openModal = useUI((s) => s.openModal);
@@ -57,7 +65,19 @@ export function Grid({ tasks }: { tasks: Task[] }) {
           <tr>
             <th className="col-id">ID</th>
             <th className="col-wbs">WBS</th>
-            <th className="col-title">Title</th>
+            {/* Title: ancho arrastrable. `min-width` también, porque en una tabla con
+                layout automático el ancho declarado es apenas una sugerencia y el
+                contenido mínimo de la celda podría estirar la columna igual. */}
+            <th className="col-title" style={{ width: titleWidth, minWidth: titleWidth }}>
+              Title
+              <span
+                className={`col-resizer ${titleResizing ? "dragging" : ""}`}
+                onMouseDown={onTitleResizeStart}
+                title="Drag to resize the column"
+                role="separator"
+                aria-orientation="vertical"
+              />
+            </th>
             <th className="col-date">Start</th>
             <th className="col-date">End</th>
             <th className="col-dur">Duration</th>
