@@ -53,10 +53,10 @@ Rule applied: **one process per container**. Putting Postgres + Node + Vite in a
 | 7 | **Dependencies** | Yes (not on parent rows) | E.g. `3FS` (Finish-Start with ID 3). Types supported in v1: **FS, SS and FF** (SF is out of scope). **Auto-scheduling:** when a dependency is set or edited, the successor's dates are adjusted to the predecessor (preserving its Duration), MS Project style. With several, the latest constraint wins. It also enables the critical path calculation. |
 | 8 | **Owner** | Yes | A single owner. Autocomplete from values already present in other rows. |
 
-**Focusing an editable field — with Tab or with the mouse — selects all of its text**, so typing replaces the value instead of appending to it. Two things are preserved: a second click inside a field that already has focus places the caret normally, and dragging to select part of the text is not overridden. Tab moves field to field (the 📅 date-picker button is out of the tab order).
+**Focusing an editable field — with Tab or with the mouse — selects all of its text**, so typing replaces the value instead of appending to it. Two things are preserved: a second click inside a field that already has focus places the caret normally, and dragging to select part of the text is not overridden. Tab moves field to field (the 📅 date-picker button is out of the tab order). **Inserting a row focuses its Title**, so the title can be typed without clicking first.
 
 ### Fields only in the modal (opened from the ID link)
-- **Description:** rich text editor (bold, italic, underline, ordered and unordered lists). **Stored as Markdown**.
+- **Description:** rich text editor (bold, italic, underline, ordered and unordered lists). **Stored as Markdown**. The buttons behave as **toggles** and show their on/off state for the current selection.
 - The modal also allows editing the rest of the left panel's visible columns.
 - **Save / Cancel:** the modal is **not** autosave (unlike the grid). Changes accumulate in a local draft; **Save** sends them in a single PATCH and closes, **Cancel** closes and discards them.
 
@@ -74,8 +74,9 @@ Rule applied: **one process per container**. Putting Postgres + Node + Vite in a
 
 ## Timeline (right panel)
 - Horizontal bars aligned with the grid rows.
-- **Dependency arrows** drawn both in the normal view and in critical path view (SVG).
+- **Dependency arrows** drawn both in the normal view and in critical path view (SVG). They leave and arrive on the **outer** edge of the bars, and the final segment runs **horizontally into the arrowhead**, so the line meets the vertical side of the triangle instead of a diagonal one. When the successor starts before the predecessor finishes, the route wraps around the bars rather than doubling back into them.
 - Milestones as a diamond (◆).
+- **No hover highlight:** moving the mouse over the timeline does not shade the row. The selected row is highlighted; nothing else follows the pointer.
 - **Dragging bars:** from the **body** the whole task moves (Start and End together, **preserving the Duration**: only the Start is sent and the engine recomputes the end); from the **left** edge the Start moves with the End fixed, and from the **right** edge the End moves — in those two cases the Duration is recomputed. The resulting date snaps to the nearest working day (Sat→Fri, Sun→Mon) and, when resizing, stops against the opposite edge (minimum 1 day). Does not apply to parent rows (computed dates) or to milestones (duration-0 diamonds).
   - If the task has **Dependencies**, auto-scheduling recomputes its Start from the predecessor after the drag, so the bar returns to its place: the dependency wins (same as when resizing). To move it, remove or change the dependency.
 - Zoom with **Day / Week / Month** buttons.

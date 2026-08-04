@@ -9,13 +9,16 @@ The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the ful
 - **Editable grid** with hierarchy (WBS 1, 1.1, 1.2.1), inline editing and autosave. The **ID** column stays frozen when scrolling horizontally.
 - **Date recalculation** Start ↔ End ↔ Duration in working days (Mon–Fri; no holidays). Duration accepts `5d`, `2w` and `1m` (`1w` = 5 days; `1m` = the working days per month set in Settings).
 - **Auto-scheduling from dependencies** (MS Project style): FS, SS and FF. When a dependency is set or edited, the successor is rescheduled preserving its Duration.
-- **Parent roll-up**: Start/End/Duration of summary rows are computed from their children.
+- **No circular dependencies**: a row cannot depend on itself, on an ancestor, or on anything that already depends on it (directly or through other rows). The server answers `409`, an indent that would close a cycle is rejected too, and the cell goes back to its previous value.
+- **Parent roll-up**: Start/End/Duration of summary rows are computed from their children. Summary rows accept neither dates nor dependencies (both are derived).
+- **Critical path**: CPM toggle in the toolbar that paints the zero-slack bars red. A dependency on a summary row is translated to the leaves that actually drive its date.
 - **Milestones** (Duration 0) drawn as a ◆ diamond.
 - **Gantt chart** with bars aligned to the rows, **Day / Week / Month** scale, a "today" marker, dependency arrows (SVG) and vertical scroll synchronized with the grid.
 - **Draggable bars**: dragging the **body** moves the whole task (Start and End together, preserving the Duration); dragging the **left** edge moves the Start and the **right** edge moves the End (there the Duration is recomputed). The resulting date snaps to the nearest working day.
 - **Settings** (⚙️ in the toolbar): a popup to configure app behaviour, with **Save / Cancel**. It holds the **date format** used by Start and End (5 common formats) and the **working days per month** (20/21/22) that `1m` means in the Duration field. Both are stored in the browser.
 - **Detail modal** (from the ID link) with a rich-text description editor stored as Markdown and **Save / Cancel** buttons (the modal is not autosave: cancelling discards).
 - Reorder / indent / outdent / add / delete rows.
+- **Editing that gets out of the way**: focusing a field (with Tab or the mouse) selects all of its text, a new row focuses its Title, and a cell whose change the server rejects reverts instead of showing an unsaved value.
 - **Discarding blank rows:** when the selection moves to another row, the one left behind is deleted if it ended up completely empty (no title, dates, owner, dependencies or description, and with the Duration untouched).
 
 > Status: **phase by phase** implementation (see [Roadmap](#roadmap)). Phases 1–6 complete.
@@ -90,7 +93,7 @@ project-gantt/
 │  ├─ src/
 │  │  ├─ routes/            task REST endpoints
 │  │  ├─ services/          recompute (WBS, scheduling, roll-up)
-│  │  └─ lib/               working days, dependencies, tree, schedule
+│  │  └─ lib/               working days, dependencies, tree, schedule, critical path
 │  ├─ prisma/
 │  │  ├─ schema.prisma      schema of the `tasks` table
 │  │  ├─ migrations/        migration history (versioned)
@@ -111,9 +114,9 @@ Base: `http://localhost:3000/api`
 | GET | `/tasks` | Ordered list of tasks (pre-order) |
 | GET | `/tasks/:id` | Detail of a task (404 if it doesn't exist) |
 | POST | `/tasks` | Creates a row. Body: `{ title?, parentId?, afterId? }` (`afterId` inserts below and inherits the parent) |
-| PATCH | `/tasks/:id` | **Autosave** per field (last-write-wins). Editing `start`/`end`/`durationDays`/`dependencies` triggers the recalculation. On parent rows both the dates **and** the dependencies return `409` (the dates are computed from the children, so the dependency belongs on the first child) |
+| PATCH | `/tasks/:id` | **Autosave** per field (last-write-wins). Editing `start`/`end`/`durationDays`/`dependencies` triggers the recalculation. Returns `409` for: dates or dependencies on a parent row (both are derived, so the dependency belongs on the first child), and a dependency that is **circular** — on itself, on an ancestor, or on a row that already depends on this one |
 | POST | `/tasks/:id/move` | Reorders among siblings. Body: `{ direction: "up" \| "down" }` |
-| POST | `/tasks/:id/indent` | Turns the row into a child of the previous sibling |
+| POST | `/tasks/:id/indent` | Turns the row into a child of the previous sibling. `409` if the new parent–child edge would close a dependency cycle |
 | POST | `/tasks/:id/outdent` | Moves the row up one level |
 | DELETE | `/tasks/:id` | Deletes the row (children cascade) |
 
@@ -137,11 +140,13 @@ After every mutation, the server recomputes **WBS + order**, applies the **depen
 
 ## Tests
 
-Back-end unit tests (date utilities, dependency parsing and the scheduling engine):
+Back-end unit tests (date utilities, dependency parsing, the scheduling engine — including the cycle rules — and the CPM):
 
 ```bash
 docker compose exec server npm test
 ```
+
+42 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
 
 ---
 
