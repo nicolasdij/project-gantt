@@ -38,13 +38,13 @@ Rule applied: **one process per container**. Putting Postgres + Node + Vite in a
 
 ## App layout
 - Toolbar on top.
-- Left panel: grid of rows/columns (editable).
+- Left panel: grid of rows/columns (editable). The **ID** column is frozen: scrolling horizontally moves the other columns under it. The header row is frozen the same way vertically.
 - Right panel: the Gantt timeline (horizontal bars, dependency arrows).
 
 ## Left panel columns (in this order)
 | # | Column | Editable | Notes |
 |---|--------|----------|-------|
-| 1 | **ID** | No (autogen) | Sequential number, MS Project style. Used in Dependencies. It is a **link**: clicking it opens the edit modal. |
+| 1 | **ID** | No (autogen) | Sequential number, MS Project style. Used in Dependencies. It is a **link**: clicking it opens the edit modal. **Frozen column:** it stays in place when the left panel is scrolled horizontally. |
 | 2 | **WBS** | No (autogen) | Hierarchical (1, 1.1, 1.2.1). Text (not editable). |
 | 3 | **Title** | Yes | Short title of the item. |
 | 4 | **Start Date** | Yes | Rendered in the format chosen in **Settings**. On edit → recomputes **End** (from Duration, skipping weekends). |

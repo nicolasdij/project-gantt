@@ -6,7 +6,7 @@ The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the ful
 
 ## Features
 
-- **Editable grid** with hierarchy (WBS 1, 1.1, 1.2.1), inline editing and autosave.
+- **Editable grid** with hierarchy (WBS 1, 1.1, 1.2.1), inline editing and autosave. The **ID** column stays frozen when scrolling horizontally.
 - **Date recalculation** Start ↔ End ↔ Duration in working days (Mon–Fri; no holidays). Duration accepts `5d`, `2w` and `1m` (`1w` = 5 days; `1m` = the working days per month set in Settings).
 - **Auto-scheduling from dependencies** (MS Project style): FS, SS and FF. When a dependency is set or edited, the successor is rescheduled preserving its Duration.
 - **Parent roll-up**: Start/End/Duration of summary rows are computed from their children.

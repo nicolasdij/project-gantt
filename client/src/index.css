@@ -280,7 +280,12 @@ body {
   min-width: max-content;
 }
 table.grid {
-  border-collapse: collapse;
+  /* `separate` y no `collapse`: con collapse, position:sticky en celdas no funciona
+     (bug de Safari), y la columna ID va fija. El render no cambia porque cada celda
+     dibuja solo su borde derecho (y la primera, el izquierdo): no hay bordes que
+     duplicar. spacing 0 para que no aparezcan huecos entre celdas. */
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
   font-size: 13px;
 }
@@ -302,7 +307,9 @@ table.grid {
   position: sticky;
   top: 0;
   background: var(--bg-header);
-  z-index: 1;
+  /* Por encima de la columna ID fija (z-index 1): al scrollear en vertical, la
+     cabecera tapa las celdas de ID. */
+  z-index: 2;
   height: 48px; /* HEAD_H — debe coincidir con layout.ts */
   padding: 0 8px;
   vertical-align: middle;
@@ -330,6 +337,35 @@ table.grid {
 
 .col-id {
   width: 44px;
+}
+
+/* Columna ID FIJA: no se mueve al scrollear el panel en horizontal.
+   Las celdas necesitan fondo opaco propio (el de la fila lo pinta el <tr>, y la celda
+   pegada quedaría transparente dejando ver lo que pasa por debajo) y un borde derecho
+   más marcado para que se lea el corte. */
+.grid td.col-id {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg);
+  border-right-color: var(--border-strong);
+}
+.grid thead th.col-id {
+  left: 0;
+  /* Esquina: sobre la cabecera pegada (2) y sobre la columna ID (1). */
+  z-index: 3;
+  border-right-color: var(--border-strong);
+}
+/* El fondo del <tr> no lo hereda la celda pegada: se repite acá. El orden importa
+   (misma especificidad): selected gana sobre parent, y parent sobre hover. */
+.grid tbody tr:hover td.col-id {
+  background: var(--bg-hover);
+}
+.grid tbody tr.row-parent td.col-id {
+  background: var(--bg-parent);
+}
+.grid tbody tr.row-selected td.col-id {
+  background: var(--bg-selected);
 }
 .col-wbs {
   width: 64px;
