@@ -98,11 +98,12 @@ export function TaskModal() {
     const data: PatchData = {};
     if (d.title !== base.title) data.title = d.title;
     if (d.owner !== base.owner) data.owner = d.owner;
-    if (d.dependencies !== base.dependencies) data.dependencies = d.dependencies;
     if (d.descriptionMd !== base.descriptionMd) data.descriptionMd = d.descriptionMd;
 
-    // En las filas padre Start/End/Duration son calculados: nunca se envían.
+    // En las filas padre Start/End/Duration son calculados y las Dependencies no
+    // aplican (el server rechaza ambos con 409): nunca se envían.
     if (!isParent) {
+      if (d.dependencies !== base.dependencies) data.dependencies = d.dependencies;
       if (d.start !== base.start) data.start = d.start;
       if (d.end !== base.end) data.end = d.end;
       if (d.duration !== base.duration) {
@@ -211,18 +212,23 @@ export function TaskModal() {
             </label>
             <label className="field">
               <span>Dependencies</span>
-              <input
-                className="cell-input"
-                placeholder="e.g. 3FS"
-                value={draft.dependencies}
-                onChange={(e) => setField("dependencies", e.target.value)}
-              />
+              {isParent ? (
+                <span className="ro">{draft.dependencies || "—"}</span>
+              ) : (
+                <input
+                  className="cell-input"
+                  placeholder="e.g. 3FS"
+                  value={draft.dependencies}
+                  onChange={(e) => setField("dependencies", e.target.value)}
+                />
+              )}
             </label>
           </div>
 
           {isParent && (
             <p className="hint">
-              Start/End/Duration of a parent row are rolled up from its children (not editable).
+              Start/End/Duration of a parent row are rolled up from its children (not editable),
+              so it cannot have dependencies either — set them on the first child instead.
             </p>
           )}
 

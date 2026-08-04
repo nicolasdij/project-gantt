@@ -110,7 +110,7 @@ Base: `http://localhost:3000/api`
 | GET | `/tasks` | Lista de tareas ordenada (pre-orden) |
 | GET | `/tasks/:id` | Detalle de una tarea (404 si no existe) |
 | POST | `/tasks` | Crea fila. Body: `{ title?, parentId?, afterId? }` (`afterId` inserta debajo y hereda el padre) |
-| PATCH | `/tasks/:id` | **Autosave** por campo (last-write-wins). Editar `start`/`end`/`durationDays`/`dependencies` dispara el recálculo. En filas padre las fechas devuelven `409` (son calculadas) |
+| PATCH | `/tasks/:id` | **Autosave** por campo (last-write-wins). Editar `start`/`end`/`durationDays`/`dependencies` dispara el recálculo. En filas padre las fechas **y** las dependencias devuelven `409` (las fechas son calculadas desde los hijos, así que la dependencia va en el primer hijo) |
 | POST | `/tasks/:id/move` | Reordena entre hermanos. Body: `{ direction: "up" \| "down" }` |
 | POST | `/tasks/:id/indent` | Convierte la fila en hija del hermano anterior |
 | POST | `/tasks/:id/outdent` | Sube la fila un nivel |

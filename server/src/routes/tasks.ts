@@ -119,8 +119,26 @@ export async function taskRoutes(app: FastifyInstance) {
       if (f in body) data[f] = body[f];
     }
 
+    // Las fechas de un padre son calculadas (roll-up de los hijos), y las
+    // Dependencies son justamente la entrada del scheduling: en un padre no
+    // significan nada (el scheduler solo programa hojas), así que tampoco se aceptan.
+    const touchesDates = DATE_FIELDS.some((f) => f in body);
+    const touchesDeps = "dependencies" in body;
+    const parent = touchesDates || touchesDeps ? await isParent(id) : false;
+    if (parent && touchesDates) {
+      return reply
+        .code(409)
+        .send({ error: "Start/End/Duration of a parent row are rolled up from its children (not editable)" });
+    }
+    if (parent && touchesDeps) {
+      return reply.code(409).send({
+        error:
+          "A parent row cannot have dependencies: its dates are rolled up from its children. Set the dependency on the first child instead.",
+      });
+    }
+
     // Dependencies: llegan en ID VISIBLE (seq) → traducir a id interno antes de guardar.
-    if ("dependencies" in body) {
+    if (touchesDeps) {
       const all = await prisma.task.findMany();
       const { seqToId } = buildMaps(all);
       const raw = body.dependencies == null ? "" : String(body.dependencies);
@@ -128,14 +146,7 @@ export async function taskRoutes(app: FastifyInstance) {
     }
 
     // Campos de fecha: pasan por el motor de recálculo.
-    const touchesDates = DATE_FIELDS.some((f) => f in body);
     if (touchesDates) {
-      // Los padres tienen Start/End/Duration calculados: no son editables.
-      if (await isParent(id)) {
-        return reply
-          .code(409)
-          .send({ error: "Start/End/Duration of a parent row are rolled up from its children (not editable)" });
-      }
       // Construye el edit SOLO con las claves presentes en el body: el motor de
       // recálculo usa Object.keys para saber qué campos se editaron.
       const edit: { start?: string | null; end?: string | null; durationDays?: number } = {};

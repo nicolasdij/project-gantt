@@ -51,7 +51,7 @@ Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en u
 | 5 | **End Date** | Sí | Formato YYYY-MM-DD. Al editar → recalcula **Duration**. |
 | 6 | **Duration** | Sí | `Nd` / `Nw`. `1w` = 5 días laborables. Al editar → recalcula **End**. |
 | 7 | **Owner** | Sí | Un solo responsable. Autocomplete con valores ya existentes en otras filas. |
-| 8 | **Dependencies** | Sí | Ej. `3FS` (Finish-Start con el ID 3). Tipos soportados en v1: **FS, SS y FF** (SF queda fuera del alcance). **Auto-scheduling:** al fijar/editar una dependencia, las fechas del sucesor se ajustan al predecesor (conservando su Duration), estilo MS Project. Con varias, se toma la restricción más tardía. Habilita también el cálculo del camino crítico. |
+| 8 | **Dependencies** | Sí (no en filas padre) | Ej. `3FS` (Finish-Start con el ID 3). Tipos soportados en v1: **FS, SS y FF** (SF queda fuera del alcance). **Auto-scheduling:** al fijar/editar una dependencia, las fechas del sucesor se ajustan al predecesor (conservando su Duration), estilo MS Project. Con varias, se toma la restricción más tardía. Habilita también el cálculo del camino crítico. |
 
 ### Campos solo en el modal (abierto desde el link del ID)
 - **Description:** editor rich text (negrita, cursiva, subrayado, listas numeradas y sin numerar). Se **guarda como Markdown**.
@@ -65,7 +65,7 @@ Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en u
   - Editar **End Date** → recalcula **Duration**.
   - Editar **Duration** → recalcula **End Date** (usando Start + días laborables).
   - Editar **Start Date** → recalcula **End Date** (manteniendo Duration).
-- **Filas padre (resumen):** Start/End/Duration se **calculan automáticamente** desde los hijos (start = mín de hijos, end = máx de hijos) → **no editables** en padres.
+- **Filas padre (resumen):** Start/End/Duration se **calculan automáticamente** desde los hijos (start = mín de hijos, end = máx de hijos) → **no editables** en padres. Tampoco admiten **Dependencies**: son la entrada del scheduling, que solo programa hojas (la dependencia va en el primer hijo del grupo).
 
 ## Timeline (panel derecho)
 - Barras horizontales alineadas con las filas del grid.
@@ -109,4 +109,5 @@ Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en u
    - El **rombo del milestone** se dibuja **centrado** dentro de la columna de su día. ✅
    - Notificaciones/errores por **modal propio** (nunca `alert()`/`confirm()` del navegador). ✅
 7. **Descarte de filas en blanco:** al mover la selección de una fila a otra, la fila que se deja atrás se elimina si quedó totalmente vacía. "Vacía" = title, start, end, owner, dependencies y descripción vacíos, **y** Duration sin tocar (el campo nunca puede quedar en blanco: la fila nace con `1d`, así que se exige ese valor por defecto; una duración tipeada cuenta como contenido). No se descarta una fila con hijos (el borrado es en cascada). La evaluación espera a que terminen las mutaciones y el refetch en vuelo, porque el autosave del blur dispara su PATCH en el mismo click que cambia la selección. ✅
-8. **Modal de detalle = formulario, no autosave:** el popup del ID tiene botones **Guardar** (envía los campos modificados en un solo PATCH y cierra) y **Cancelar** (cierra descartando). ✕, Escape y el click en el fondo equivalen a Cancelar. El grid sigue siendo autosave por celda. ✅
+8. **Dependencies no se admiten en filas padre:** el scheduler solo programa hojas (las fechas de un padre son roll-up), así que una dependencia en un padre no programaba nada y solo dibujaba una flecha engañosa. Ahora la celda es de solo lectura (en el grid y en el modal), la API responde `409` y el Gantt no dibuja la flecha. Una fila padre **sí** puede ser predecesora. Si una hoja con dependencias pasa a ser padre (al indentar), el valor guardado queda a la vista pero inerte. ✅
+9. **Modal de detalle = formulario, no autosave:** el popup del ID tiene botones **Guardar** (envía los campos modificados en un solo PATCH y cierra) y **Cancelar** (cierra descartando). ✕, Escape y el click en el fondo equivalen a Cancelar. El grid sigue siendo autosave por celda. ✅

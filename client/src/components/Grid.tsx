@@ -130,12 +130,25 @@ export function Grid({ tasks }: { tasks: Task[] }) {
                     onCommit={(v) => edit(t.id, { owner: v })}
                   />
                 </td>
+                {/* Dependencies: en un padre no se editan. Sus fechas son roll-up de los
+                    hijos, así que la dependencia no programaría nada (va en el primer hijo).
+                    Si quedó un valor de cuando la fila era hoja, se muestra: está ignorado,
+                    pero esconderlo sería peor que dejarlo a la vista. */}
                 <td className="col-deps">
-                  <EditableText
-                    value={t.dependencies ?? ""}
-                    placeholder="e.g. 3FS"
-                    onCommit={(v) => edit(t.id, { dependencies: v })}
-                  />
+                  {isParent ? (
+                    <span
+                      className="ro"
+                      title="A parent row cannot have dependencies: its dates are rolled up from its children. Set the dependency on the first child instead."
+                    >
+                      {t.dependencies || "—"}
+                    </span>
+                  ) : (
+                    <EditableText
+                      value={t.dependencies ?? ""}
+                      placeholder="e.g. 3FS"
+                      onCommit={(v) => edit(t.id, { dependencies: v })}
+                    />
+                  )}
                 </td>
               </tr>
             );

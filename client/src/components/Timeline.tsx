@@ -161,6 +161,10 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
     const stub = 10; // saliente desde el borde de la barra
     const entry = 6; // tramo horizontal mínimo de entrada (da dirección a la punta)
     for (const t of tasks) {
+      // Una fila padre no puede ser sucesora: sus fechas son roll-up de los hijos y el
+      // scheduler no la programa, así que dibujar la flecha afirmaría algo que no pasa.
+      // (Sí puede ser PREDECESORA: eso el scheduler lo respeta.)
+      if (parentIds.has(t.id)) continue;
       const succ = geom.get(t.id);
       if (!succ || (!t.start && !t.end)) continue;
       for (const dep of parseDependencies(t.dependencies)) {
@@ -205,7 +209,7 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
       }
     }
     return paths;
-  }, [tasks, geom, idBySeq]);
+  }, [tasks, geom, idBySeq, parentIds]);
 
   return (
     <div className="panel panel-timeline" ref={ref}>
