@@ -1,7 +1,10 @@
 // Editor WYSIWYG ligero: negrita, cursiva, subrayado, listas (ordenadas y no).
 // Se edita como HTML (contentEditable) y se GUARDA como Markdown.
 //   - MD → HTML al inicializar (marked).
-//   - HTML → MD al perder foco (turndown). El subrayado se conserva como <u>.
+//   - HTML → MD en cada `input` y en el blur (turndown). El subrayado se conserva
+//     como <u>. Commitear en `input` (y no solo en el blur) es lo que garantiza que
+//     el botón Guardar del modal vea lo último tipeado sin depender de que el click
+//     mueva el foco fuera del editor.
 import { useEffect, useRef } from "react";
 import { marked } from "marked";
 import TurndownService from "turndown";
@@ -10,6 +13,10 @@ const turndown = new TurndownService({
   headingStyle: "atx",
   bulletListMarker: "-",
   codeBlockStyle: "fenced",
+  // Cursiva con `*` y NO con `_` (el default de turndown): CommonMark no reconoce
+  // `_` en medio de una palabra, así que "negrita + negrita-cursiva" pegadas se
+  // guardaban como `**Asdf_Zxc_**` y al releerlas los `_` aparecían literales.
+  emDelimiter: "*",
 });
 // Markdown no tiene subrayado nativo: lo conservamos como HTML <u>.
 turndown.keep(["u"]);
@@ -73,6 +80,7 @@ export function MarkdownEditor({ value, onChange }: Props) {
         className="md-content"
         contentEditable
         suppressContentEditableWarning
+        onInput={commit}
         onBlur={commit}
       />
     </div>

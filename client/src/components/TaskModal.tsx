@@ -49,9 +49,8 @@ export function TaskModal() {
   );
 
   const [draft, setDraft] = useState<Draft | null>(null);
-  // Espejo del borrador en un ref: el commit de la descripción ocurre en el blur
-  // que dispara el propio click en "Guardar", así que el handler necesita leer el
-  // último valor de forma sincrónica (sin esperar al re-render).
+  // Espejo del borrador en un ref: los handlers (en particular el de Guardar) leen
+  // el último valor de forma sincrónica, sin esperar al re-render.
   const draftRef = useRef<Draft | null>(null);
   // Valores al abrir el modal: se envía solo lo que cambió respecto a esta base.
   const baseRef = useRef<Draft | null>(null);
@@ -227,13 +226,17 @@ export function TaskModal() {
             </p>
           )}
 
-          <label className="field">
+          {/* OJO: no envolver el editor en un <label>. Un <label> se asocia al primer
+              elemento labelable que contiene y el `div contentEditable` no lo es, así
+              que tomaría como control al primer botón de la toolbar (Bold) y le
+              reenviaría todos los clicks del área de texto: el caret nunca entraría. */}
+          <div className="field">
             <span>Description</span>
             <MarkdownEditor
               value={draft.descriptionMd}
               onChange={(md) => setField("descriptionMd", md)}
             />
-          </label>
+          </div>
         </div>
 
         <div className="modal-footer">
