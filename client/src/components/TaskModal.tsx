@@ -9,7 +9,7 @@ import type { PatchData } from "../api.ts";
 import { useUI } from "../store.ts";
 import { useTasks, useTaskMutations } from "../queries.ts";
 import { MarkdownEditor } from "./MarkdownEditor.tsx";
-import { EditableDate } from "./cells.tsx";
+import { EditableDate, useSelectAllOnFocus } from "./cells.tsx";
 import { formatDuration, parseDuration, isoToDate, formatIsoAs } from "../lib/format.ts";
 
 // Borrador: todo como string, tal cual se teclea (la Duration se parsea al guardar).
@@ -58,6 +58,7 @@ export function TaskModal() {
   // Valores al abrir el modal: se envía solo lo que cambió respecto a esta base.
   const baseRef = useRef<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  const selectAll = useSelectAllOnFocus();
 
   const setField = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     const current = draftRef.current;
@@ -159,6 +160,7 @@ export function TaskModal() {
             <input
               className="cell-input"
               value={draft.title}
+              {...selectAll}
               onChange={(e) => setField("title", e.target.value)}
             />
           </label>
@@ -196,6 +198,7 @@ export function TaskModal() {
                 <input
                   className="cell-input"
                   value={draft.duration}
+                  {...selectAll}
                   onChange={(e) => setField("duration", e.target.value)}
                 />
               )}
@@ -213,6 +216,7 @@ export function TaskModal() {
                   className="cell-input"
                   placeholder="e.g. 3FS"
                   value={draft.dependencies}
+                  {...selectAll}
                   onChange={(e) => setField("dependencies", e.target.value)}
                 />
               )}
@@ -222,6 +226,7 @@ export function TaskModal() {
               <input
                 className="cell-input"
                 value={draft.owner}
+                {...selectAll}
                 onChange={(e) => setField("owner", e.target.value)}
               />
             </label>

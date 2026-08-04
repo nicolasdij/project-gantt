@@ -53,6 +53,8 @@ Rule applied: **one process per container**. Putting Postgres + Node + Vite in a
 | 7 | **Dependencies** | Yes (not on parent rows) | E.g. `3FS` (Finish-Start with ID 3). Types supported in v1: **FS, SS and FF** (SF is out of scope). **Auto-scheduling:** when a dependency is set or edited, the successor's dates are adjusted to the predecessor (preserving its Duration), MS Project style. With several, the latest constraint wins. It also enables the critical path calculation. |
 | 8 | **Owner** | Yes | A single owner. Autocomplete from values already present in other rows. |
 
+**Focusing an editable field — with Tab or with the mouse — selects all of its text**, so typing replaces the value instead of appending to it. Two things are preserved: a second click inside a field that already has focus places the caret normally, and dragging to select part of the text is not overridden. Tab moves field to field (the 📅 date-picker button is out of the tab order).
+
 ### Fields only in the modal (opened from the ID link)
 - **Description:** rich text editor (bold, italic, underline, ordered and unordered lists). **Stored as Markdown**.
 - The modal also allows editing the rest of the left panel's visible columns.

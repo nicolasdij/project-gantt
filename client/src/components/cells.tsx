@@ -3,6 +3,32 @@ import { useEffect, useRef, useState } from "react";
 import { useUI } from "../store.ts";
 import { formatIsoAs, parseDateInput } from "../lib/format.ts";
 
+/**
+ * Devuelve los handlers para que un campo aparezca con TODO su texto seleccionado al
+ * tomar el foco, con Tab o con el mouse.
+ *
+ * El `onFocus` solo no alcanza para el mouse: el foco llega en el mousedown y el
+ * mouseup posterior colapsa la selección, dejando el caret donde se clickeó. De ahí el
+ * paso por mouseup. Dos casos que se respetan:
+ *   - si se ARRASTRÓ para seleccionar una parte, no se pisa esa selección;
+ *   - si el campo YA tenía el foco, el click reposiciona el caret como siempre.
+ */
+export function useSelectAllOnFocus() {
+  const pending = useRef(false);
+  return {
+    onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.currentTarget.select(),
+    onMouseDown: (e: React.MouseEvent<HTMLInputElement>) => {
+      pending.current = document.activeElement !== e.currentTarget;
+    },
+    onMouseUp: (e: React.MouseEvent<HTMLInputElement>) => {
+      if (!pending.current) return;
+      pending.current = false;
+      const el = e.currentTarget;
+      if (el.selectionStart === el.selectionEnd) el.select();
+    },
+  };
+}
+
 type TextProps = {
   value: string;
   /**
@@ -31,6 +57,7 @@ export function EditableText({
   onAutoFocused,
 }: TextProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectAll = useSelectAllOnFocus();
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
 
@@ -65,6 +92,7 @@ export function EditableText({
       value={draft}
       placeholder={placeholder}
       list={listId}
+      {...selectAll}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -102,6 +130,7 @@ type DateProps = {
  */
 export function EditableDate({ value, onCommit, commitOn = "blur" }: DateProps) {
   const dateFormat = useUI((s) => s.dateFormat);
+  const selectAll = useSelectAllOnFocus();
   const picker = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(() => formatIsoAs(value, dateFormat));
 
@@ -139,6 +168,7 @@ export function EditableDate({ value, onCommit, commitOn = "blur" }: DateProps) 
         className="cell-input"
         value={draft}
         placeholder={dateFormat}
+        {...selectAll}
         onChange={(e) => onType(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
@@ -155,6 +185,10 @@ export function EditableDate({ value, onCommit, commitOn = "blur" }: DateProps) 
         type="button"
         className="date-picker-btn"
         title="Open date picker"
+        // Fuera del orden de tabulación: el Tab va campo a campo (como en una planilla)
+        // y no se detiene en el botón. Con teclado la fecha se tipea en el formato
+        // elegido, que es justamente para lo que está el campo de texto.
+        tabIndex={-1}
         // El nativo tiene que estar renderizado para que showPicker() no tire
         // InvalidStateError: por eso se oculta con opacity/1px, no con display:none.
         onClick={() => picker.current?.showPicker?.()}
