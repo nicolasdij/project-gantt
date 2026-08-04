@@ -175,7 +175,14 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
   const arrows = useMemo(() => {
     const paths: { d: string; key: string }[] = [];
     const stub = 10; // saliente desde el borde de la barra
-    const entry = 6; // tramo horizontal mínimo de entrada (da dirección a la punta)
+    // Tramo recto final, el que le da dirección a la punta. Tiene que ser MÁS LARGO
+    // que la cabeza de la flecha: la punta ocupa markerWidth × stroke-width
+    // (7 × 1.4 ≈ 10px, porque markerUnits es strokeWidth por defecto) hacia atrás
+    // desde el vértice. Si el tramo es más corto, la cabeza se pasa de la esquina y el
+    // tramo anterior entra por el lado DIAGONAL del triángulo en vez de por su lado
+    // vertical. Con 14 quedan ~4px de línea recta visibles antes de la cabeza.
+    const HEAD_LEN = 10;
+    const entry = HEAD_LEN + 4;
     for (const t of tasks) {
       // Una fila padre no puede ser sucesora: sus fechas son roll-up de los hijos y el
       // scheduler no la programa, así que dibujar la flecha afirmaría algo que no pasa.
@@ -203,12 +210,13 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
         const y2 = succ.cy;
         let d: string;
         if (dep.type === "FF") {
-          // Une los FINES (bordes derechos): enruta por FUERA, a la derecha de ambas barras.
-          const goRight = Math.max(x1, x2) + stub;
+          // Une los FINES (bordes derechos): enruta por FUERA, a la derecha de ambas
+          // barras, a `entry` del más lejano para que la cabeza entre derecha.
+          const goRight = Math.max(x1, x2) + entry;
           d = `M ${x1} ${y1} H ${goRight} V ${y2} H ${x2}`;
         } else if (dep.type === "SS") {
           // Une los INICIOS (bordes izquierdos): enruta por FUERA, a la izquierda de ambas barras.
-          const goLeft = Math.min(x1, x2) - stub;
+          const goLeft = Math.min(x1, x2) - entry;
           d = `M ${x1} ${y1} H ${goLeft} V ${y2} H ${x2}`;
         } else if (x2 >= x1 + stub + entry) {
           // FS con espacio: sale del fin del predecesor (derecha), baja, y entra al
