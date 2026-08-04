@@ -395,6 +395,43 @@ table.grid {
   color: var(--muted);
 }
 
+/* Celda de fecha: texto en el formato elegido + botón que abre el datepicker.
+   El input `date` nativo queda renderizado pero invisible: showPicker() tira
+   InvalidStateError si el elemento no se está renderizando (no vale display:none). */
+.date-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 30px;
+}
+.date-cell .cell-input {
+  flex: 1;
+  min-width: 0;
+}
+.date-picker-btn {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.date-picker-btn:hover {
+  opacity: 1;
+}
+.date-picker-native {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Inputs de celda: ocupan toda la celda, sin borde salvo al enfocar. */
 .cell-input {
   width: 100%;
@@ -413,6 +450,12 @@ table.grid {
 }
 .row-parent .cell-input {
   font-weight: 600;
+}
+/* Un <select> con la altura fija y el line-height de .cell-input recorta el texto:
+   que se dimensione por su contenido más el padding. */
+select.cell-input {
+  height: auto;
+  line-height: 1.4;
 }
 
 /* ---------- Modal ---------- */
@@ -434,6 +477,10 @@ table.grid {
   max-height: 85vh;
   overflow: auto;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+/* Popups cortos (Settings): no necesitan los 640px del modal de detalle. */
+.modal-narrow {
+  width: 420px;
 }
 .modal-header {
   display: flex;

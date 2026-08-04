@@ -23,14 +23,77 @@ export function isoToDate(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
-/**
- * ISO → "dd/mm/yyyy" para las celdas de SOLO LECTURA (fechas de filas padre).
- * En las filas editables el formato lo dibuja el `input type="date"` del navegador;
- * esto es para que las filas padre muestren la fecha igual y no en ISO.
- */
-export function isoToDisplayDate(iso: string | null): string {
+// --- Formato de fecha configurable (Settings) ---------------------------------
+// Todas las fechas Start/End que la app dibuja pasan por formatIsoAs(); lo que se
+// tipea vuelve a ISO con parseDateInput(). Por eso las celdas editables son un input
+// de TEXTO y no un `input type="date"`: el nativo se dibuja según el locale del
+// navegador y no hay forma de imponerle un formato.
+
+export const DATE_FORMATS = [
+  "DD/MM/YYYY",
+  "MM/DD/YYYY",
+  "YYYY-MM-DD",
+  "DD.MM.YYYY",
+  "MMM D, YYYY",
+] as const;
+
+export type DateFormat = (typeof DATE_FORMATS)[number];
+export const DEFAULT_DATE_FORMAT: DateFormat = "DD/MM/YYYY";
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** ISO (o "YYYY-MM-DD") → texto en el formato elegido. "" si no hay fecha. */
+export function formatIsoAs(iso: string | null, format: DateFormat): string {
   const [y, m, d] = isoToDate(iso).split("-");
-  return y && m && d ? `${d}/${m}/${y}` : "";
+  if (!y || !m || !d) return "";
+  switch (format) {
+    case "MM/DD/YYYY":
+      return `${m}/${d}/${y}`;
+    case "YYYY-MM-DD":
+      return `${y}-${m}-${d}`;
+    case "DD.MM.YYYY":
+      return `${d}.${m}.${y}`;
+    case "MMM D, YYYY":
+      return `${MONTHS_SHORT[Number(m) - 1]} ${Number(d)}, ${y}`;
+    default:
+      return `${d}/${m}/${y}`;
+  }
+}
+
+/**
+ * Texto tipeado → "YYYY-MM-DD", o null si no es una fecha válida en ese formato.
+ * Los separadores son tolerantes (4-8-2026 vale para DD/MM/YYYY), pero el ORDEN de
+ * los campos lo manda el formato elegido: "04/08/2026" es 4-ago en DD/MM/YYYY y
+ * 8-abr en MM/DD/YYYY.
+ */
+export function parseDateInput(text: string, format: DateFormat): string | null {
+  const t = text.trim();
+  if (!t) return null;
+
+  let y: number, m: number, d: number;
+  if (format === "MMM D, YYYY") {
+    const parts = t.match(/^([A-Za-z]{3,})\s+(\d{1,2}),?\s+(\d{4})$/);
+    if (!parts) return null;
+    const month = MONTHS_SHORT.findIndex(
+      (name) => name.toLowerCase() === parts[1].slice(0, 3).toLowerCase(),
+    );
+    if (month < 0) return null;
+    [m, d, y] = [month + 1, Number(parts[2]), Number(parts[3])];
+  } else {
+    const nums = t.split(/\D+/).filter(Boolean).map(Number);
+    if (nums.length !== 3) return null;
+    if (format === "YYYY-MM-DD") [y, m, d] = nums;
+    else if (format === "MM/DD/YYYY") [m, d, y] = nums;
+    else [d, m, y] = nums; // DD/MM/YYYY y DD.MM.YYYY
+  }
+
+  if (y < 1000 || y > 9999 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const iso = `${y}-${pad2(m)}-${pad2(d)}`;
+  // Descarta días que no existen (31/02): el round-trip por Date tiene que coincidir.
+  const parsed = new Date(`${iso}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== iso) return null;
+  return iso;
 }
 
 /** "YYYY-MM-DD" + n días de calendario. En UTC, para no depender de la zona horaria. */

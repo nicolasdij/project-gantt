@@ -10,6 +10,7 @@ export function Toolbar() {
   const selectedId = useUI((s) => s.selectedId);
   const select = useUI((s) => s.select);
   const requestTitleFocus = useUI((s) => s.requestTitleFocus);
+  const openSettings = useUI((s) => s.openSettings);
   const zoom = useUI((s) => s.zoom);
   const setZoom = useUI((s) => s.setZoom);
   const showCritical = useUI((s) => s.showCritical);
@@ -132,6 +133,13 @@ export function Toolbar() {
       </div>
 
       <div className="tb-spacer" />
+
+      <div className="tb-group">
+        <button className="tb-btn" title="Settings" onClick={openSettings}>
+          ⚙️
+        </button>
+      </div>
+
       <div className="save-indicator">{saving > 0 ? "Saving…" : "Saved"}</div>
 
       {confirmingDelete && selectedTask && (

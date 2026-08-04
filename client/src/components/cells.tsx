@@ -1,5 +1,7 @@
 // Celdas editables inline del grid. Confirman en blur o Enter; cancelan en Escape.
 import { useEffect, useRef, useState } from "react";
+import { useUI } from "../store.ts";
+import { formatIsoAs, parseDateInput } from "../lib/format.ts";
 
 type TextProps = {
   value: string;
@@ -66,66 +68,93 @@ export function EditableText({
 type DateProps = {
   value: string; // YYYY-MM-DD o ""
   onCommit: (next: string) => void;
+  /**
+   * Cuándo se confirma lo tipeado. "blur" (default) es lo que quiere el grid: cada
+   * commit es un PATCH, así que no puede salir uno por tecla. "input" es para el
+   * modal, donde onCommit solo escribe en un borrador local: confirma en cuanto el
+   * texto ya es una fecha válida, así el botón Save ve el valor sin depender de que
+   * el click mueva el foco fuera del campo.
+   */
+  commitOn?: "blur" | "input";
 };
 
-export function EditableDate({ value, onCommit }: DateProps) {
-  const ref = useRef<HTMLInputElement>(null);
-  const [draft, setDraft] = useState(value);
-  // Último valor ya confirmado, para no commitear dos veces el mismo valor.
-  const committed = useRef(value);
-  // ¿El cambio actual provino de TECLEO? Si sí, se recalcula en el blur; si no
-  // (viene del datepicker), se recalcula de inmediato.
-  const typed = useRef(false);
+/**
+ * Celda de fecha. Es un input de TEXTO en el formato elegido en Settings (un
+ * `input type="date"` nativo se dibuja según el locale del navegador y no admite
+ * formato propio), más un botón que abre el datepicker nativo de un input oculto.
+ * Se conservan las dos reglas de antes: tipear NO recalcula hasta el blur, y elegir
+ * en el datepicker confirma de inmediato.
+ */
+export function EditableDate({ value, onCommit, commitOn = "blur" }: DateProps) {
+  const dateFormat = useUI((s) => s.dateFormat);
+  const picker = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState(() => formatIsoAs(value, dateFormat));
+
+  // Re-formatea al cambiar el valor o el formato elegido, pero respeta lo que se está
+  // tipeando si ya significa esa misma fecha (si no, "4/8/2026" saltaría a
+  // "04/08/2026" en plena escritura).
   useEffect(() => {
-    setDraft(value);
-    committed.current = value;
-  }, [value]);
+    setDraft((cur) => (value !== "" && parseDateInput(cur, dateFormat) === value ? cur : formatIsoAs(value, dateFormat)));
+  }, [value, dateFormat]);
+
+  const onType = (text: string) => {
+    setDraft(text);
+    if (commitOn !== "input") return;
+    // Solo cuando ya es una fecha válida: nunca revierte a medio tipear.
+    const iso = parseDateInput(text, dateFormat);
+    if (iso != null && iso !== value) onCommit(iso);
+  };
 
   const commit = () => {
-    const v = ref.current?.value ?? draft;
-    if (v !== committed.current) {
-      committed.current = v;
-      onCommit(v);
+    const text = draft.trim();
+    if (text === "") {
+      if (value !== "") onCommit(""); // se borró la fecha
+      return;
     }
+    const iso = parseDateInput(text, dateFormat);
+    // Fecha inválida en este formato: se revierte (no se manda nada al server).
+    if (iso == null) return setDraft(formatIsoAs(value, dateFormat));
+    if (iso !== value) onCommit(iso);
+    else setDraft(formatIsoAs(value, dateFormat)); // normaliza lo tipeado
   };
-  const commitRef = useRef(commit);
-  commitRef.current = commit;
-
-  // Evento NATIVO `change` (no el `onChange` de React, que es `input` y salta por
-  // cada segmento). Al elegir en el datepicker no hubo tecleo → confirmar ya; si
-  // hubo tecleo, se difiere al blur (no recalcular mientras se escribe).
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const onNativeChange = () => {
-      if (!typed.current) commitRef.current();
-    };
-    el.addEventListener("change", onNativeChange);
-    return () => el.removeEventListener("change", onNativeChange);
-  }, []);
 
   return (
-    <input
-      ref={ref}
-      type="date"
-      className="cell-input"
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)} // solo actualiza el draft (no recalcula)
-      onBlur={() => {
-        commit(); // recalcula al quitar el foco (caso tecleo)
-        typed.current = false;
-      }}
-      onKeyDown={(e) => {
-        typed.current = true; // hubo tecleo → no recalcular hasta el blur
-        if (e.key === "Enter") {
-          ref.current?.blur();
-        } else if (e.key === "Escape") {
-          if (ref.current) ref.current.value = value; // revierte el DOM sin disparar change
-          setDraft(value);
-          typed.current = false;
-          ref.current?.blur();
-        }
-      }}
-    />
+    <div className="date-cell">
+      <input
+        className="cell-input"
+        value={draft}
+        placeholder={dateFormat}
+        onChange={(e) => onType(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            commit();
+            (e.target as HTMLInputElement).blur();
+          } else if (e.key === "Escape") {
+            setDraft(formatIsoAs(value, dateFormat));
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+      />
+      <button
+        type="button"
+        className="date-picker-btn"
+        title="Open date picker"
+        // El nativo tiene que estar renderizado para que showPicker() no tire
+        // InvalidStateError: por eso se oculta con opacity/1px, no con display:none.
+        onClick={() => picker.current?.showPicker?.()}
+      >
+        📅
+      </button>
+      <input
+        ref={picker}
+        type="date"
+        className="date-picker-native"
+        tabIndex={-1}
+        aria-hidden
+        value={value}
+        onChange={(e) => onCommit(e.target.value)} // el datepicker confirma ya
+      />
+    </div>
   );
 }

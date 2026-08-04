@@ -47,8 +47,8 @@ Rule applied: **one process per container**. Putting Postgres + Node + Vite in a
 | 1 | **ID** | No (autogen) | Sequential number, MS Project style. Used in Dependencies. It is a **link**: clicking it opens the edit modal. |
 | 2 | **WBS** | No (autogen) | Hierarchical (1, 1.1, 1.2.1). Text (not editable). |
 | 3 | **Title** | Yes | Short title of the item. |
-| 4 | **Start Date** | Yes | Format YYYY-MM-DD. On edit → recomputes **End** (from Duration, skipping weekends). |
-| 5 | **End Date** | Yes | Format YYYY-MM-DD. On edit → recomputes **Duration**. |
+| 4 | **Start Date** | Yes | Rendered in the format chosen in **Settings**. On edit → recomputes **End** (from Duration, skipping weekends). |
+| 5 | **End Date** | Yes | Rendered in the format chosen in **Settings**. On edit → recomputes **Duration**. |
 | 6 | **Duration** | Yes | `Nd` / `Nw`. `1w` = 5 working days. On edit → recomputes **End**. |
 | 7 | **Owner** | Yes | A single owner. Autocomplete from values already present in other rows. |
 | 8 | **Dependencies** | Yes (not on parent rows) | E.g. `3FS` (Finish-Start with ID 3). Types supported in v1: **FS, SS and FF** (SF is out of scope). **Auto-scheduling:** when a dependency is set or edited, the successor's dates are adjusted to the predecessor (preserving its Duration), MS Project style. With several, the latest constraint wins. It also enables the critical path calculation. |
@@ -90,7 +90,16 @@ Rule applied: **one process per container**. Putting Postgres + Node + Vite in a
 3. 🔺 **Move up** · 🔻 **Move down** (reorder)
 4. 🔴 **Toggle critical path**
 5. **Day · Week · Month** (zoom)
+6. ⚙️ **Settings** (opens the settings popup)
 - Autosave: no save button; a status indicator is shown ("Saving… / Saved").
+
+## Settings (⚙️ popup in the toolbar)
+Configures app behaviour. Same pattern as the detail modal: changes live in a local draft and are only applied with **Save**; **Cancel** (and ✕ / Escape / clicking the backdrop) closes discarding them.
+
+- **Date format** — applies to the Start and End dates in the grid and in the item modal. Options: `DD/MM/YYYY`, `MM/DD/YYYY`, `YYYY-MM-DD`, `DD.MM.YYYY`, `MMM D, YYYY` (the dropdown shows each one rendered with today's date).
+- **Where it is stored:** `localStorage` in the browser, not the database. It is a UI preference, not project data, and the app has no users or sessions to hang it off server-side. If `localStorage` is unavailable (private mode), the default applies and the choice lasts for the session.
+- **Consequence on the editable cells:** a native `input type="date"` renders according to the *browser's* locale and cannot be given a format, so the Start/End cells are **text inputs** that show the chosen format, plus a 📅 button that opens the native date picker (via `showPicker()` on a hidden input). The two prior rules still hold: typing does not recalculate until blur, and picking in the date picker commits immediately.
+- **What is typed** is parsed in the chosen format: the separators are tolerant (`4-8-2026` works for `DD/MM/YYYY`) but the field **order** is the one from the format — `04/08/2026` is 4-Aug under `DD/MM/YYYY` and 8-Apr under `MM/DD/YYYY`. A date that doesn't exist (31/02) or that doesn't match the format reverts and nothing is sent to the server.
 
 ## Implementation plan (phases)
 1. **Scaffolding:** monorepo `/client` + `/server` + `docker-compose.yml` (Postgres). Prisma schema: `tasks` table (id, wbs, parentId, order, title, start, end, durationDays, isMilestone, owner, dependencies, descriptionMd) + migrations and seed.
@@ -113,4 +122,5 @@ Rule applied: **one process per container**. Putting Postgres + Node + Vite in a
    - Notifications/errors through **our own modal** (never the browser's `alert()`/`confirm()`). ✅
 7. **Discarding blank rows:** when the selection moves from one row to another, the row left behind is deleted if it ended up completely empty. "Empty" = title, start, end, owner, dependencies and description all empty, **and** Duration untouched (the field can never be left blank: a row is born with `1d`, so that default value is required; a typed duration counts as content). A row with children is not discarded (deletion cascades). The evaluation waits for in-flight mutations and refetches to finish, because the blur autosave fires its PATCH in the same click that changes the selection. ✅
 8. **Dependencies are not accepted on parent rows:** the scheduler only schedules leaves (a parent's dates are roll-up), so a dependency on a parent scheduled nothing and only drew a misleading arrow. The cell is now read-only (in the grid and in the modal), the API answers `409`, and the Gantt does not draw the arrow. A parent row **can** be a predecessor. If a leaf with dependencies becomes a parent (by indenting), the stored value stays visible but inert. ✅
-9. **Detail modal = form, not autosave:** the ID popup has **Save** (sends the modified fields in a single PATCH and closes) and **Cancel** (closes discarding) buttons. ✕, Escape and clicking the backdrop are equivalent to Cancel. The grid remains autosave per cell. ✅
+9. **Settings in `localStorage`, not in the database:** the date format is a UI preference — see the [Settings](#settings--popup-in-the-toolbar) section. The editable Start/End cells stopped being `input type="date"` because that control's format comes from the browser locale; they are now text inputs in the chosen format plus a button that opens the native picker. ✅
+10. **Detail modal = form, not autosave:** the ID popup has **Save** (sends the modified fields in a single PATCH and closes) and **Cancel** (closes discarding) buttons. ✕, Escape and clicking the backdrop are equivalent to Cancel. The grid remains autosave per cell. ✅

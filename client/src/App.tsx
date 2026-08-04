@@ -9,6 +9,7 @@ import { Toolbar } from "./components/Toolbar.tsx";
 import { Grid } from "./components/Grid.tsx";
 import { Timeline } from "./components/Timeline.tsx";
 import { TaskModal } from "./components/TaskModal.tsx";
+import { SettingsModal } from "./components/SettingsModal.tsx";
 import { NoticeModal } from "./components/NoticeModal.tsx";
 
 const MIN_GRID = 240; // ancho mínimo de cada panel al arrastrar
@@ -120,6 +121,7 @@ export default function App() {
       </main>
 
       <TaskModal />
+      <SettingsModal />
       <NoticeModal />
     </div>
   );

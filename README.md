@@ -13,6 +13,7 @@ The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the ful
 - **Milestones** (Duration 0) drawn as a ◆ diamond.
 - **Gantt chart** with bars aligned to the rows, **Day / Week / Month** scale, a "today" marker, dependency arrows (SVG) and vertical scroll synchronized with the grid.
 - **Draggable bars**: dragging the **body** moves the whole task (Start and End together, preserving the Duration); dragging the **left** edge moves the Start and the **right** edge moves the End (there the Duration is recomputed). The resulting date snaps to the nearest working day.
+- **Settings** (⚙️ in the toolbar): a popup to configure app behaviour, with **Save / Cancel**. For now it holds the **date format** used by Start and End (5 common formats); the choice is stored in the browser.
 - **Detail modal** (from the ID link) with a rich-text description editor stored as Markdown and **Save / Cancel** buttons (the modal is not autosave: cancelling discards).
 - Reorder / indent / outdent / add / delete rows.
 - **Discarding blank rows:** when the selection moves to another row, the one left behind is deleted if it ended up completely empty (no title, dates, owner, dependencies or description, and with the Duration untouched).

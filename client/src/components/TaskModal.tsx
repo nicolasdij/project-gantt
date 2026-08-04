@@ -9,7 +9,8 @@ import type { PatchData } from "../api.ts";
 import { useUI } from "../store.ts";
 import { useTasks, useTaskMutations } from "../queries.ts";
 import { MarkdownEditor } from "./MarkdownEditor.tsx";
-import { formatDuration, parseDuration, isoToDate, isoToDisplayDate } from "../lib/format.ts";
+import { EditableDate } from "./cells.tsx";
+import { formatDuration, parseDuration, isoToDate, formatIsoAs } from "../lib/format.ts";
 
 // Borrador: todo como string, tal cual se teclea (la Duration se parsea al guardar).
 type Draft = {
@@ -36,6 +37,7 @@ export function TaskModal() {
   const modalTaskId = useUI((s) => s.modalTaskId);
   const closeModal = useUI((s) => s.closeModal);
   const showError = useUI((s) => s.showError);
+  const dateFormat = useUI((s) => s.dateFormat);
   const { data: tasks = [] } = useTasks();
   const { patch } = useTaskMutations();
 
@@ -164,26 +166,24 @@ export function TaskModal() {
             <label className="field">
               <span>Start</span>
               {isParent ? (
-                <span className="ro">{isoToDisplayDate(draft.start) || "—"}</span>
+                <span className="ro">{formatIsoAs(draft.start, dateFormat) || "—"}</span>
               ) : (
-                <input
-                  type="date"
-                  className="cell-input"
+                <EditableDate
                   value={draft.start}
-                  onChange={(e) => setField("start", e.target.value)}
+                  commitOn="input"
+                  onCommit={(v) => setField("start", v)}
                 />
               )}
             </label>
             <label className="field">
               <span>End</span>
               {isParent ? (
-                <span className="ro">{isoToDisplayDate(draft.end) || "—"}</span>
+                <span className="ro">{formatIsoAs(draft.end, dateFormat) || "—"}</span>
               ) : (
-                <input
-                  type="date"
-                  className="cell-input"
+                <EditableDate
                   value={draft.end}
-                  onChange={(e) => setField("end", e.target.value)}
+                  commitOn="input"
+                  onCommit={(v) => setField("end", v)}
                 />
               )}
             </label>
