@@ -1,102 +1,102 @@
 # Project Gantt
 
-Aplicación web tipo **Smartsheet / MS Project** (versión propia y gratuita): un planificador de proyectos con grid editable a la izquierda y un diagrama de Gantt a la derecha.
+A **Smartsheet / MS Project** style web app (our own, free version): a project planner with an editable grid on the left and a Gantt chart on the right.
 
-Toda la aplicación corre en **Docker**. Ver [`SPEC.md`](./SPEC.md) para la especificación completa y el registro de decisiones.
+The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the full specification and the record of decisions.
 
-## Funcionalidades
+## Features
 
-- **Grid editable** con jerarquía (WBS 1, 1.1, 1.2.1), edición inline y autosave.
-- **Recálculo de fechas** Start ↔ End ↔ Duration en días laborables (Lun–Vie; sin feriados).
-- **Auto-scheduling por dependencias** (estilo MS Project): FS, SS y FF. Al fijar/editar una dependencia, el sucesor se reprograma conservando su Duration.
-- **Roll-up de padres**: Start/End/Duration de las filas resumen se calculan desde sus hijos.
-- **Milestones** (Duration 0) representados como rombo ◆.
-- **Diagrama de Gantt** con barras alineadas a las filas, escala **Day / Week / Month**, marcador de "hoy", flechas de dependencia (SVG) y scroll vertical sincronizado con el grid.
-- **Barras arrastrables**: desde el **cuerpo** se mueve la tarea completa (Start y End juntos, conservando la Duration); desde el borde **izquierdo** se mueve el Start y desde el **derecho** el End (ahí la Duration se recalcula). La fecha resultante se pega al día laborable más cercano.
-- **Modal de detalle** (desde el link del ID) con editor de descripción rich-text guardado como Markdown y botones **Guardar / Cancelar** (el modal no es autosave: descarta si cancelás).
-- Reordenar / indent / outdent / add / delete filas.
-- **Descarte de filas en blanco:** al pasar la selección a otra fila, la que se deja atrás se elimina si quedó totalmente vacía (sin título, fechas, owner, dependencies ni descripción, y con la Duration sin tocar).
+- **Editable grid** with hierarchy (WBS 1, 1.1, 1.2.1), inline editing and autosave.
+- **Date recalculation** Start ↔ End ↔ Duration in working days (Mon–Fri; no holidays).
+- **Auto-scheduling from dependencies** (MS Project style): FS, SS and FF. When a dependency is set or edited, the successor is rescheduled preserving its Duration.
+- **Parent roll-up**: Start/End/Duration of summary rows are computed from their children.
+- **Milestones** (Duration 0) drawn as a ◆ diamond.
+- **Gantt chart** with bars aligned to the rows, **Day / Week / Month** scale, a "today" marker, dependency arrows (SVG) and vertical scroll synchronized with the grid.
+- **Draggable bars**: dragging the **body** moves the whole task (Start and End together, preserving the Duration); dragging the **left** edge moves the Start and the **right** edge moves the End (there the Duration is recomputed). The resulting date snaps to the nearest working day.
+- **Detail modal** (from the ID link) with a rich-text description editor stored as Markdown and **Save / Cancel** buttons (the modal is not autosave: cancelling discards).
+- Reorder / indent / outdent / add / delete rows.
+- **Discarding blank rows:** when the selection moves to another row, the one left behind is deleted if it ended up completely empty (no title, dates, owner, dependencies or description, and with the Duration untouched).
 
-> Estado: implementación **fase por fase** (ver [Roadmap](#roadmap)). Fases 1–4 completas.
+> Status: **phase by phase** implementation (see [Roadmap](#roadmap)). Phases 1–6 complete.
 
 ## Stack
 
 - **Front-end:** React + Vite + TypeScript · TanStack Query · Zustand.
 - **Back-end:** Node.js + Fastify + Prisma (TypeScript).
-- **Base de datos:** PostgreSQL 16.
-- **Orquestación:** Docker Compose (una imagen por componente).
+- **Database:** PostgreSQL 16.
+- **Orchestration:** Docker Compose (one image per component).
 
 ---
 
-## Requisitos previos
+## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) y **Docker Compose v2** (`docker compose`, incluido en Docker Desktop).
-- No necesitas Node.js instalado en local: todo (incluida la base de datos) corre en contenedores.
+- [Docker](https://docs.docker.com/get-docker/) and **Docker Compose v2** (`docker compose`, included in Docker Desktop).
+- You don't need Node.js installed locally: everything (including the database) runs in containers.
 
-## Puesta en marcha
+## Getting started
 
 ```bash
-git clone <URL-DEL-REPO>
+git clone <REPO-URL>
 cd project-gantt
 docker compose up --build
 ```
 
-Esto construye y levanta **3 contenedores** y aplica las migraciones de la base de datos automáticamente al arrancar el server:
+This builds and starts **3 containers** and applies the database migrations automatically when the server boots:
 
-| Servicio | URL | Descripción |
+| Service | URL | Description |
 |---|---|---|
-| `client` | http://localhost:5173 | Front-end React + Vite (hot-reload) |
-| `server` | http://localhost:3000 | API Fastify + Prisma (hot-reload) |
-| `db`     | localhost:5432 | PostgreSQL 16 (volumen persistente) |
+| `client` | http://localhost:5173 | React + Vite front-end (hot-reload) |
+| `server` | http://localhost:3000 | Fastify + Prisma API (hot-reload) |
+| `db`     | localhost:5432 | PostgreSQL 16 (persistent volume) |
 
-Abre **http://localhost:5173** en el navegador.
+Open **http://localhost:5173** in the browser.
 
-### Cargar datos de ejemplo (seed)
+### Load sample data (seed)
 
-La base arranca vacía. Para cargar un proyecto de ejemplo (7 tareas con jerarquía, dependencias y un milestone):
+The database starts empty. To load a sample project (7 tasks with hierarchy, dependencies and one milestone):
 
 ```bash
 docker compose exec server npm run db:seed
 ```
 
-Vuelve a ejecutarlo cuando quieras **resetear** los datos de ejemplo (reinicia también los IDs a 1..7).
+Run it again whenever you want to **reset** the sample data (it also resets the IDs to 1..7).
 
-### Comandos útiles
+### Useful commands
 
 ```bash
-docker compose up -d          # levantar en segundo plano
-docker compose logs -f server # ver logs del server
-docker compose down           # parar y eliminar contenedores (conserva la DB)
-docker compose down -v        # parar y BORRAR también el volumen de la DB (reset total)
-docker compose exec server npm test   # tests unitarios del server
+docker compose up -d          # start in the background
+docker compose logs -f server # follow the server logs
+docker compose down           # stop and remove the containers (keeps the DB)
+docker compose down -v        # stop and ALSO delete the DB volume (full reset)
+docker compose exec server npm test   # server unit tests
 ```
 
 ---
 
-## Estructura del proyecto
+## Project structure
 
 ```
 project-gantt/
 ├─ client/                  Front-end (React + Vite + TS)
 │  ├─ src/
-│  │  ├─ components/        Grid, Timeline, Toolbar, modales…
-│  │  ├─ lib/               escala de tiempo, layout, parsers, formato
-│  │  ├─ api.ts             cliente HTTP
-│  │  ├─ queries.ts         hooks de datos (TanStack Query) + autosave
-│  │  └─ store.ts           estado de UI (Zustand)
+│  │  ├─ components/        Grid, Timeline, Toolbar, modals…
+│  │  ├─ lib/               time scale, layout, parsers, formatting
+│  │  ├─ api.ts             HTTP client
+│  │  ├─ queries.ts         data hooks (TanStack Query) + autosave
+│  │  └─ store.ts           UI state (Zustand)
 │  └─ Dockerfile.dev
 ├─ server/                  Back-end (Fastify + Prisma + TS)
 │  ├─ src/
-│  │  ├─ routes/            endpoints REST de tasks
+│  │  ├─ routes/            task REST endpoints
 │  │  ├─ services/          recompute (WBS, scheduling, roll-up)
-│  │  └─ lib/               fechas laborables, dependencias, árbol, schedule
+│  │  └─ lib/               working days, dependencies, tree, schedule
 │  ├─ prisma/
-│  │  ├─ schema.prisma      esquema de la tabla `tasks`
-│  │  ├─ migrations/        historial de migraciones (versionado)
-│  │  └─ seed.ts            datos de ejemplo
+│  │  ├─ schema.prisma      schema of the `tasks` table
+│  │  ├─ migrations/        migration history (versioned)
+│  │  └─ seed.ts            sample data
 │  └─ Dockerfile.dev
-├─ docker-compose.yml       orquestación de desarrollo (3 contenedores)
-├─ SPEC.md                  especificación y decisiones
+├─ docker-compose.yml       development orchestration (3 containers)
+├─ SPEC.md                  specification and decisions
 └─ README.md
 ```
 
@@ -104,39 +104,39 @@ project-gantt/
 
 Base: `http://localhost:3000/api`
 
-| Método | Ruta | Descripción |
+| Method | Path | Description |
 |---|---|---|
-| GET | `/health` | Estado del server + conexión a la DB |
-| GET | `/tasks` | Lista de tareas ordenada (pre-orden) |
-| GET | `/tasks/:id` | Detalle de una tarea (404 si no existe) |
-| POST | `/tasks` | Crea fila. Body: `{ title?, parentId?, afterId? }` (`afterId` inserta debajo y hereda el padre) |
-| PATCH | `/tasks/:id` | **Autosave** por campo (last-write-wins). Editar `start`/`end`/`durationDays`/`dependencies` dispara el recálculo. En filas padre las fechas **y** las dependencias devuelven `409` (las fechas son calculadas desde los hijos, así que la dependencia va en el primer hijo) |
-| POST | `/tasks/:id/move` | Reordena entre hermanos. Body: `{ direction: "up" \| "down" }` |
-| POST | `/tasks/:id/indent` | Convierte la fila en hija del hermano anterior |
-| POST | `/tasks/:id/outdent` | Sube la fila un nivel |
-| DELETE | `/tasks/:id` | Borra la fila (hijos en cascada) |
+| GET | `/health` | Server status + DB connection |
+| GET | `/tasks` | Ordered list of tasks (pre-order) |
+| GET | `/tasks/:id` | Detail of a task (404 if it doesn't exist) |
+| POST | `/tasks` | Creates a row. Body: `{ title?, parentId?, afterId? }` (`afterId` inserts below and inherits the parent) |
+| PATCH | `/tasks/:id` | **Autosave** per field (last-write-wins). Editing `start`/`end`/`durationDays`/`dependencies` triggers the recalculation. On parent rows both the dates **and** the dependencies return `409` (the dates are computed from the children, so the dependency belongs on the first child) |
+| POST | `/tasks/:id/move` | Reorders among siblings. Body: `{ direction: "up" \| "down" }` |
+| POST | `/tasks/:id/indent` | Turns the row into a child of the previous sibling |
+| POST | `/tasks/:id/outdent` | Moves the row up one level |
+| DELETE | `/tasks/:id` | Deletes the row (children cascade) |
 
-Tras cada mutación, el server recalcula **WBS + orden**, aplica el **auto-scheduling por dependencias** y el **roll-up de padres**.
+After every mutation, the server recomputes **WBS + order**, applies the **dependency auto-scheduling** and the **parent roll-up**.
 
 ---
 
-## Notas de desarrollo
+## Development notes
 
-- **Hot-reload:** el server usa `nodemon --legacy-watch` (polling) y el client `vite` con `usePolling`. Es necesario para que los cambios en el bind-mount se detecten sobre Docker en macOS/Windows.
-- **Al añadir dependencias npm** a `client` o `server`: como `node_modules` vive en un volumen nombrado, `--build` no basta. Reinstala dentro del contenedor:
+- **Hot-reload:** the server uses `nodemon --legacy-watch` (polling) and the client `vite` with `usePolling`. This is required for bind-mount changes to be detected under Docker on macOS/Windows.
+- **When adding npm dependencies** to `client` or `server`: since `node_modules` lives in a named volume, `--build` is not enough. Reinstall inside the container:
   ```bash
   docker compose exec <server|client> npm install
   ```
-  (o elimina el volumen `project-gantt_<svc>-node-modules` y recrea el servicio).
-- **Migraciones:** el server ejecuta `prisma migrate deploy` al arrancar. Para crear una nueva migración tras cambiar el esquema:
+  (or delete the `project-gantt_<svc>-node-modules` volume and recreate the service).
+- **Migrations:** the server runs `prisma migrate deploy` at boot. To create a new migration after changing the schema:
   ```bash
-  docker compose exec server npm run db:migrate -- --name <nombre>
+  docker compose exec server npm run db:migrate -- --name <name>
   ```
-- **Puertos ocupados:** si 5173/3000/5432 están en uso, edita el mapeo en `docker-compose.yml`.
+- **Ports in use:** if 5173/3000/5432 are taken, edit the mapping in `docker-compose.yml`.
 
 ## Tests
 
-Tests unitarios del back-end (utilidades de fechas, parseo de dependencias y motor de scheduling):
+Back-end unit tests (date utilities, dependency parsing and the scheduling engine):
 
 ```bash
 docker compose exec server npm test
@@ -146,11 +146,11 @@ docker compose exec server npm test
 
 ## Roadmap
 
-Implementación **fase por fase** (plan detallado en [`SPEC.md`](./SPEC.md)).
+**Phase by phase** implementation (detailed plan in [`SPEC.md`](./SPEC.md)).
 
-- [x] **Fase 1** — Scaffolding (monorepo, Docker Compose, Prisma + seed)
-- [x] **Fase 2** — Backend / API (CRUD, autosave, WBS, roll-up, fechas laborables)
-- [x] **Fase 3** — Panel izquierdo (grid editable, modal, indent/outdent, reordenar)
-- [x] **Fase 4** — Panel derecho (Gantt: barras, zoom, hoy, dependencias, milestones)
-- [x] **Fase 5** — Camino crítico (CPM: backward pass sobre FS/SS/FF + toggle rojo)
-- [x] **Fase 6** — Pulido (commit al perder foco, fines de semana sombreados, milestone centrado, indicador de autosave, errores por modal)
+- [x] **Phase 1** — Scaffolding (monorepo, Docker Compose, Prisma + seed)
+- [x] **Phase 2** — Backend / API (CRUD, autosave, WBS, roll-up, working days)
+- [x] **Phase 3** — Left panel (editable grid, modal, indent/outdent, reordering)
+- [x] **Phase 4** — Right panel (Gantt: bars, zoom, today, dependencies, milestones)
+- [x] **Phase 5** — Critical path (CPM: backward pass over FS/SS/FF + red toggle)
+- [x] **Phase 6** — Polish (commit on blur, shaded weekends, centered milestone, autosave indicator, errors via modal)

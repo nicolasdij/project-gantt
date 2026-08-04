@@ -1,116 +1,116 @@
-# Project Gantt — Especificación acordada
+# Project Gantt — Agreed Specification
 
-> Aplicación web tipo Smartsheet / MS Project (versión propia y gratuita).
-> Este documento captura todas las decisiones tomadas antes de empezar a codificar,
-> para que cualquier sesión futura pueda retomar el trabajo sin contexto previo.
+> A Smartsheet / MS Project style web app (our own, free version).
+> This document captures every decision made before writing code, so that any
+> future session can pick the work up again with no prior context.
 
-## Stack técnico
-- **Front-end:** React + Vite (TypeScript), estado con Zustand/React Query, editor Markdown ligero.
-- **Back-end:** Node.js + Fastify + Prisma (ORM), API REST.
-- **Base de datos:** PostgreSQL vía Docker Compose.
-- **Modelo de uso:** multi-usuario, autosave (last-write-wins por campo), un proyecto para empezar (extensible a varios).
-- **Estructura:** monorepo con `/client`, `/server` y `docker-compose.yml`.
-- **Ejecución:** toda la aplicación corre en Docker (ver [Arquitectura Docker](#arquitectura-docker)).
+## Technical stack
+- **Front-end:** React + Vite (TypeScript), state with Zustand/React Query, lightweight Markdown editor.
+- **Back-end:** Node.js + Fastify + Prisma (ORM), REST API.
+- **Database:** PostgreSQL via Docker Compose.
+- **Usage model:** multi-user, autosave (last-write-wins per field), a single project to start with (extensible to several).
+- **Structure:** monorepo with `/client`, `/server` and `docker-compose.yml`.
+- **Execution:** the whole application runs in Docker (see [Docker architecture](#docker-architecture)).
 
-## Arquitectura Docker
-Toda la app corre en contenedores, orquestados con Docker Compose. Se usa **una imagen por componente** (enfoque granular), no una imagen monolítica.
+## Docker architecture
+The entire app runs in containers, orchestrated with Docker Compose. It uses **one image per component** (granular approach), not a monolithic image.
 
-### Topología
-- **Desarrollo → 3 contenedores:**
-  - `db` — imagen oficial `postgres:16` + volumen persistente.
-  - `server` — build de `./server` (Node + Fastify + Prisma), hot-reload montando volumen.
-  - `client` — build de `./client`, `vite dev` con hot-reload (puerto 5173).
-- **Producción → opción A (3 contenedores):**
-  - `db` — `postgres:16` + volumen.
-  - `server` — API Fastify.
-  - `client` — `nginx` sirviendo el build estático de Vite (front y back totalmente separados).
+### Topology
+- **Development → 3 containers:**
+  - `db` — official `postgres:16` image + persistent volume.
+  - `server` — build of `./server` (Node + Fastify + Prisma), hot-reload via mounted volume.
+  - `client` — build of `./client`, `vite dev` with hot-reload (port 5173).
+- **Production → option A (3 containers):**
+  - `db` — `postgres:16` + volume.
+  - `server` — Fastify API.
+  - `client` — `nginx` serving Vite's static build (front and back fully separated).
 
-### Por qué granular y no monolítico
-| Criterio | Imagen monolítica (db+server+client juntos) | Una imagen por componente (elegido) |
+### Why granular and not monolithic
+| Criterion | Monolithic image (db+server+client together) | One image per component (chosen) |
 |---|---|---|
-| **Ciclo de vida** | Rebuild de todo ante cualquier cambio | Rebuild solo del servicio tocado |
-| **Escalado / logs** | Todo mezclado, difícil de aislar | Cada servicio con sus logs y health check |
-| **Base de datos** | Postgres dentro del contenedor → datos frágiles, anti-patrón | Postgres oficial + volumen persistente |
-| **Dev vs. prod** | Un solo proceso, hot-reload sucio | `server` y `client` con hot-reload por volumen |
-| **Complejidad interna** | Requiere supervisord/multi-proceso en un contenedor (anti-patrón) | Compose orquesta; un proceso por contenedor |
+| **Lifecycle** | Rebuild everything on any change | Rebuild only the service you touched |
+| **Scaling / logs** | All mixed together, hard to isolate | Each service with its own logs and health check |
+| **Database** | Postgres inside the container → fragile data, anti-pattern | Official Postgres + persistent volume |
+| **Dev vs. prod** | A single process, messy hot-reload | `server` and `client` with volume-based hot-reload |
+| **Internal complexity** | Needs supervisord/multi-process in one container (anti-pattern) | Compose orchestrates; one process per container |
 
-Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en una sola imagen obligaría a un gestor de procesos interno, justo lo que Compose evita.
+Rule applied: **one process per container**. Putting Postgres + Node + Vite in a single image would force an internal process manager — exactly what Compose avoids.
 
-## Layout de la app
-- Toolbar arriba.
-- Panel izquierdo: grid de filas/columnas (editable).
-- Panel derecho: timeline del Gantt (barras horizontales, flechas de dependencia).
+## App layout
+- Toolbar on top.
+- Left panel: grid of rows/columns (editable).
+- Right panel: the Gantt timeline (horizontal bars, dependency arrows).
 
-## Columnas del panel izquierdo (en este orden)
-| # | Columna | Editable | Notas |
-|---|---------|----------|-------|
-| 1 | **ID** | No (autogen) | Número secuencial, estilo MS Project. Se usa en Dependencies. Es un **link**: al hacer click abre el modal de edición. |
-| 2 | **WBS** | No (autogen) | Jerárquico (1, 1.1, 1.2.1). Texto (no editable). |
-| 3 | **Title** | Sí | Título breve del ítem. |
-| 4 | **Start Date** | Sí | Formato YYYY-MM-DD. Al editar → recalcula **End** (según Duration, sin fines de semana). |
-| 5 | **End Date** | Sí | Formato YYYY-MM-DD. Al editar → recalcula **Duration**. |
-| 6 | **Duration** | Sí | `Nd` / `Nw`. `1w` = 5 días laborables. Al editar → recalcula **End**. |
-| 7 | **Owner** | Sí | Un solo responsable. Autocomplete con valores ya existentes en otras filas. |
-| 8 | **Dependencies** | Sí (no en filas padre) | Ej. `3FS` (Finish-Start con el ID 3). Tipos soportados en v1: **FS, SS y FF** (SF queda fuera del alcance). **Auto-scheduling:** al fijar/editar una dependencia, las fechas del sucesor se ajustan al predecesor (conservando su Duration), estilo MS Project. Con varias, se toma la restricción más tardía. Habilita también el cálculo del camino crítico. |
+## Left panel columns (in this order)
+| # | Column | Editable | Notes |
+|---|--------|----------|-------|
+| 1 | **ID** | No (autogen) | Sequential number, MS Project style. Used in Dependencies. It is a **link**: clicking it opens the edit modal. |
+| 2 | **WBS** | No (autogen) | Hierarchical (1, 1.1, 1.2.1). Text (not editable). |
+| 3 | **Title** | Yes | Short title of the item. |
+| 4 | **Start Date** | Yes | Format YYYY-MM-DD. On edit → recomputes **End** (from Duration, skipping weekends). |
+| 5 | **End Date** | Yes | Format YYYY-MM-DD. On edit → recomputes **Duration**. |
+| 6 | **Duration** | Yes | `Nd` / `Nw`. `1w` = 5 working days. On edit → recomputes **End**. |
+| 7 | **Owner** | Yes | A single owner. Autocomplete from values already present in other rows. |
+| 8 | **Dependencies** | Yes (not on parent rows) | E.g. `3FS` (Finish-Start with ID 3). Types supported in v1: **FS, SS and FF** (SF is out of scope). **Auto-scheduling:** when a dependency is set or edited, the successor's dates are adjusted to the predecessor (preserving its Duration), MS Project style. With several, the latest constraint wins. It also enables the critical path calculation. |
 
-### Campos solo en el modal (abierto desde el link del ID)
-- **Description:** editor rich text (negrita, cursiva, subrayado, listas numeradas y sin numerar). Se **guarda como Markdown**.
-- El modal también permite editar el resto de columnas visibles del panel izquierdo.
-- **Guardar / Cancelar:** el modal **no** es autosave (a diferencia del grid). Los cambios se acumulan en un borrador local; **Guardar** los envía en un único PATCH y cierra, **Cancelar** cierra descartándolos.
+### Fields only in the modal (opened from the ID link)
+- **Description:** rich text editor (bold, italic, underline, ordered and unordered lists). **Stored as Markdown**.
+- The modal also allows editing the rest of the left panel's visible columns.
+- **Save / Cancel:** the modal is **not** autosave (unlike the grid). Changes accumulate in a local draft; **Save** sends them in a single PATCH and closes, **Cancel** closes and discards them.
 
-## Reglas de negocio
-- **Duration:** cuenta días laborables **inclusive** (Lunes→Viernes = 5d). Solo se ignoran sábados y domingos (sin feriados por ahora).
-- **Milestone:** caso especial cuando Start = End → duración `0d`. Se dibuja como rombo (◆).
-- **Recálculos:**
-  - Editar **End Date** → recalcula **Duration**.
-  - Editar **Duration** → recalcula **End Date** (usando Start + días laborables).
-  - Editar **Start Date** → recalcula **End Date** (manteniendo Duration).
-- **Filas padre (resumen):** Start/End/Duration se **calculan automáticamente** desde los hijos (start = mín de hijos, end = máx de hijos) → **no editables** en padres. Tampoco admiten **Dependencies**: son la entrada del scheduling, que solo programa hojas (la dependencia va en el primer hijo del grupo).
-- **Nada de dependencias circulares hacia arriba:** una fila no puede depender de un **ancestro** (su padre, su abuelo…), porque las fechas del ancestro son el roll-up de esa misma fila. La API responde `409`, y también rechaza un **indent** que volvería circular una dependencia ya existente (en la fila movida o en cualquiera de sus descendientes), en vez de borrar el dato por su cuenta.
+## Business rules
+- **Duration:** counts working days **inclusive** (Monday→Friday = 5d). Only Saturdays and Sundays are skipped (no holidays for now).
+- **Milestone:** special case when Start = End → duration `0d`. Drawn as a diamond (◆).
+- **Recalculations:**
+  - Editing **End Date** → recomputes **Duration**.
+  - Editing **Duration** → recomputes **End Date** (using Start + working days).
+  - Editing **Start Date** → recomputes **End Date** (preserving Duration).
+- **Parent rows (summary):** Start/End/Duration are **computed automatically** from the children (start = min of children, end = max of children) → **not editable** on parents. They do not accept **Dependencies** either: those are the input to scheduling, which only schedules leaves (the dependency belongs on the group's first child).
+- **No circular dependencies upwards:** a row cannot depend on an **ancestor** (its parent, its grandparent…), because the ancestor's dates are the roll-up of that very row. The API answers `409`, and it also rejects an **indent** that would make an existing dependency circular (on the moved row or on any of its descendants), instead of deleting the data on its own.
 
-## Timeline (panel derecho)
-- Barras horizontales alineadas con las filas del grid.
-- **Flechas de dependencia** dibujadas tanto en vista normal como en camino crítico (SVG).
-- Milestones como rombo (◆).
-- **Arrastrar barras:** desde el **cuerpo** se mueve la tarea completa (Start y End juntos **conservando la Duration**: se manda solo el Start y el motor recalcula el fin); desde el borde **izquierdo** se mueve el Start con el End fijo y desde el **derecho** el End, y en esos dos casos la Duration se recalcula. La fecha resultante se pega al día laborable más cercano (sáb→vie, dom→lun) y, al redimensionar, frena contra el borde opuesto (mínimo 1 día). No aplica a filas padre (fechas calculadas) ni a milestones (rombos de duración 0).
-  - Si la tarea tiene **Dependencies**, el auto-scheduling recalcula su Start desde el predecesor después del arrastre, así que la barra vuelve a su lugar: la dependencia manda (igual que al redimensionar). Para moverla hay que quitar o cambiar la dependencia.
-- Zoom con botones **Day / Week / Month**.
-- Marcador de **"hoy"**.
-- Scroll horizontal (sincronizado con el grid).
+## Timeline (right panel)
+- Horizontal bars aligned with the grid rows.
+- **Dependency arrows** drawn both in the normal view and in critical path view (SVG).
+- Milestones as a diamond (◆).
+- **Dragging bars:** from the **body** the whole task moves (Start and End together, **preserving the Duration**: only the Start is sent and the engine recomputes the end); from the **left** edge the Start moves with the End fixed, and from the **right** edge the End moves — in those two cases the Duration is recomputed. The resulting date snaps to the nearest working day (Sat→Fri, Sun→Mon) and, when resizing, stops against the opposite edge (minimum 1 day). Does not apply to parent rows (computed dates) or to milestones (duration-0 diamonds).
+  - If the task has **Dependencies**, auto-scheduling recomputes its Start from the predecessor after the drag, so the bar returns to its place: the dependency wins (same as when resizing). To move it, remove or change the dependency.
+- Zoom with **Day / Week / Month** buttons.
+- **"Today"** marker.
+- Horizontal scroll (synchronized with the grid).
 
-## Camino crítico (CPM)
-- Se calcula a partir de las **Dependencies** (forward/backward pass, slack = 0).
-- Los nodos del CPM son las **hojas** (los padres son resúmenes). Una dependencia que apunta a una fila **padre** no se descarta: se traduce a las hojas del subárbol que determinan la fecha usada — las que **terminan último** para FS/FF, las que **empiezan primero** para SS. Sin esa traducción, la hoja que empuja al grupo aparecía con holgura y el camino crítico se cortaba ahí.
-- Tipos de dependencia soportados en v1: **FS (Finish-Start), SS (Start-Start) y FF (Finish-Finish)**. SF (Start-Finish) queda fuera del alcance.
-- Toggle en el toolbar: al activarlo pinta de **rojo** las barras del camino crítico; al desactivarlo vuelve a la vista normal.
+## Critical path (CPM)
+- Computed from the **Dependencies** (forward/backward pass, slack = 0).
+- The CPM nodes are the **leaves** (parents are summaries). A dependency pointing at a **parent** row is not discarded: it is translated to the leaves in the subtree that determine the date being used — the ones that **finish last** for FS/FF, the ones that **start first** for SS. Without that translation, the leaf that pushes the group showed slack and the critical path was cut there.
+- Dependency types supported in v1: **FS (Finish-Start), SS (Start-Start) and FF (Finish-Finish)**. SF (Start-Finish) is out of scope.
+- Toolbar toggle: turning it on paints the critical path bars **red**; turning it off returns to the normal view.
 
-## Toolbar (botones en íconos)
+## Toolbar (icon buttons)
 1. ➕ **Add row** · 🗑️ **Delete row**
 2. ➡️ **Indent** · ⬅️ **Outdent**
-3. 🔺 **Move up** · 🔻 **Move down** (reordenar)
+3. 🔺 **Move up** · 🔻 **Move down** (reorder)
 4. 🔴 **Toggle critical path**
 5. **Day · Week · Month** (zoom)
-- Autosave: sin botón de guardar; se muestra indicador de estado ("Saving… / Saved").
+- Autosave: no save button; a status indicator is shown ("Saving… / Saved").
 
-## Plan de implementación (fases)
-1. **Scaffolding:** monorepo `/client` + `/server` + `docker-compose.yml` (Postgres). Esquema Prisma: tabla `tasks` (id, wbs, parentId, order, title, start, end, durationDays, isMilestone, owner, dependencies, descriptionMd) + migraciones y seed.
-2. **Backend / API:** CRUD de tasks, endpoint de autosave, cálculo server-side de WBS y roll-up de padres, utilidades de fechas laborables (addWorkingDays, workingDaysBetween).
-3. **Panel izquierdo (grid):** grid editable, edición inline, recálculo Start↔End↔Duration, autocomplete de Owner, modal con editor Markdown, indent/outdent, add/delete, reordenar, WBS jerárquico, roll-up de padres.
-4. **Panel derecho (Gantt):** barras alineadas, escala Day/Week/Month, marcador "hoy", scroll sincronizado, flechas de dependencia, milestones como rombo.
-5. **Camino crítico:** motor CPM sobre las Dependencies + toggle rojo.
-6. **Pulido:** autosave con debounce + indicador, validaciones, manejo de errores.
+## Implementation plan (phases)
+1. **Scaffolding:** monorepo `/client` + `/server` + `docker-compose.yml` (Postgres). Prisma schema: `tasks` table (id, wbs, parentId, order, title, start, end, durationDays, isMilestone, owner, dependencies, descriptionMd) + migrations and seed.
+2. **Backend / API:** task CRUD, autosave endpoint, server-side WBS calculation and parent roll-up, working-day date utilities (addWorkingDays, workingDaysBetween).
+3. **Left panel (grid):** editable grid, inline editing, Start↔End↔Duration recalculation, Owner autocomplete, modal with Markdown editor, indent/outdent, add/delete, reordering, hierarchical WBS, parent roll-up.
+4. **Right panel (Gantt):** aligned bars, Day/Week/Month scale, "today" marker, synchronized scroll, dependency arrows, milestones as diamonds.
+5. **Critical path:** CPM engine over the Dependencies + red toggle.
+6. **Polish:** autosave with debounce + indicator, validations, error handling.
 
-## Decisiones tomadas
-1. **Tipos de dependencia (v1):** FS, SS y FF. SF queda fuera del alcance. ✅
-2. **Arquitectura Docker:** una imagen por componente (granular), no monolítica. Dev = 3 contenedores (db, server, client con hot-reload). Prod = opción A, 3 contenedores (db, server, client servido por nginx). ✅
-3. **Alcance de entrega:** fase por fase, validando cada fase antes de pasar a la siguiente. ✅
-4. **Auto-scheduling por dependencias:** editar una dependencia reprograma las fechas del sucesor según el tipo (FS/SS/FF), conservando la Duration; con varias, gana la más tardía. El roll-up de padres se recalcula desde los hijos ya reprogramados. ✅
-5. **Link de edición en la columna ID** (no en WBS). El diálogo de borrado es un **modal propio** (no el `confirm()` del navegador). ✅
-6. **Pulido (Fase 6):**
-   - El recálculo Start/End/Duration y el redibujado del Gantt ocurren al **perder el foco** del campo (blur), no en cada tecla. ✅
-   - Las columnas de **fin de semana** (sáb/dom) se muestran en **gris claro** en el panel derecho. ✅
-   - El **rombo del milestone** se dibuja **centrado** dentro de la columna de su día. ✅
-   - Notificaciones/errores por **modal propio** (nunca `alert()`/`confirm()` del navegador). ✅
-7. **Descarte de filas en blanco:** al mover la selección de una fila a otra, la fila que se deja atrás se elimina si quedó totalmente vacía. "Vacía" = title, start, end, owner, dependencies y descripción vacíos, **y** Duration sin tocar (el campo nunca puede quedar en blanco: la fila nace con `1d`, así que se exige ese valor por defecto; una duración tipeada cuenta como contenido). No se descarta una fila con hijos (el borrado es en cascada). La evaluación espera a que terminen las mutaciones y el refetch en vuelo, porque el autosave del blur dispara su PATCH en el mismo click que cambia la selección. ✅
-8. **Dependencies no se admiten en filas padre:** el scheduler solo programa hojas (las fechas de un padre son roll-up), así que una dependencia en un padre no programaba nada y solo dibujaba una flecha engañosa. Ahora la celda es de solo lectura (en el grid y en el modal), la API responde `409` y el Gantt no dibuja la flecha. Una fila padre **sí** puede ser predecesora. Si una hoja con dependencias pasa a ser padre (al indentar), el valor guardado queda a la vista pero inerte. ✅
-9. **Modal de detalle = formulario, no autosave:** el popup del ID tiene botones **Guardar** (envía los campos modificados en un solo PATCH y cierra) y **Cancelar** (cierra descartando). ✕, Escape y el click en el fondo equivalen a Cancelar. El grid sigue siendo autosave por celda. ✅
+## Decisions taken
+1. **Dependency types (v1):** FS, SS and FF. SF is out of scope. ✅
+2. **Docker architecture:** one image per component (granular), not monolithic. Dev = 3 containers (db, server, client with hot-reload). Prod = option A, 3 containers (db, server, client served by nginx). ✅
+3. **Delivery scope:** phase by phase, validating each phase before moving to the next. ✅
+4. **Auto-scheduling from dependencies:** editing a dependency reschedules the successor's dates according to the type (FS/SS/FF), preserving the Duration; with several, the latest one wins. The parent roll-up is recomputed from the already-rescheduled children. ✅
+5. **Edit link on the ID column** (not on WBS). The delete dialog is our **own modal** (not the browser's `confirm()`). ✅
+6. **Polish (Phase 6):**
+   - The Start/End/Duration recalculation and the Gantt redraw happen when the field **loses focus** (blur), not on every keystroke. ✅
+   - **Weekend** columns (Sat/Sun) are shown in **light grey** in the right panel. ✅
+   - The **milestone diamond** is drawn **centered** inside its day's column. ✅
+   - Notifications/errors through **our own modal** (never the browser's `alert()`/`confirm()`). ✅
+7. **Discarding blank rows:** when the selection moves from one row to another, the row left behind is deleted if it ended up completely empty. "Empty" = title, start, end, owner, dependencies and description all empty, **and** Duration untouched (the field can never be left blank: a row is born with `1d`, so that default value is required; a typed duration counts as content). A row with children is not discarded (deletion cascades). The evaluation waits for in-flight mutations and refetches to finish, because the blur autosave fires its PATCH in the same click that changes the selection. ✅
+8. **Dependencies are not accepted on parent rows:** the scheduler only schedules leaves (a parent's dates are roll-up), so a dependency on a parent scheduled nothing and only drew a misleading arrow. The cell is now read-only (in the grid and in the modal), the API answers `409`, and the Gantt does not draw the arrow. A parent row **can** be a predecessor. If a leaf with dependencies becomes a parent (by indenting), the stored value stays visible but inert. ✅
+9. **Detail modal = form, not autosave:** the ID popup has **Save** (sends the modified fields in a single PATCH and closes) and **Cancel** (closes discarding) buttons. ✕, Escape and clicking the backdrop are equivalent to Cancel. The grid remains autosave per cell. ✅
