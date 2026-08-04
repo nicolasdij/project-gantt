@@ -78,6 +78,7 @@ Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en u
 
 ## Camino crítico (CPM)
 - Se calcula a partir de las **Dependencies** (forward/backward pass, slack = 0).
+- Los nodos del CPM son las **hojas** (los padres son resúmenes). Una dependencia que apunta a una fila **padre** no se descarta: se traduce a las hojas del subárbol que determinan la fecha usada — las que **terminan último** para FS/FF, las que **empiezan primero** para SS. Sin esa traducción, la hoja que empuja al grupo aparecía con holgura y el camino crítico se cortaba ahí.
 - Tipos de dependencia soportados en v1: **FS (Finish-Start), SS (Start-Start) y FF (Finish-Finish)**. SF (Start-Finish) queda fuera del alcance.
 - Toggle en el toolbar: al activarlo pinta de **rojo** las barras del camino crítico; al desactivarlo vuelve a la vista normal.
 

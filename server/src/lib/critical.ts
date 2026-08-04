@@ -5,12 +5,18 @@
 // (late start/finish) y marcamos como críticas las tareas con holgura 0
 // (late start == early start).
 //
-// Solo se consideran las HOJAS con fechas como actividades; los padres son
-// resúmenes (roll-up), no participan en el CPM. Dependencias que apunten a un
-// padre se ignoran (caso fuera de alcance en v1).
+// Solo se consideran las HOJAS con fechas como actividades: los padres son
+// resúmenes (roll-up) y no participan como nodos del CPM.
+//
+// Un padre SÍ puede ser predecesor (el scheduler respeta esas dependencias), y por
+// eso la arista no se descarta: se TRADUCE a las hojas del subárbol que realmente
+// determinan la fecha usada — las que terminan último para FS/FF, las que empiezan
+// primero para SS. Sin esa traducción, la hoja que empuja al grupo aparecía con
+// holgura y el camino crítico se cortaba ahí (ver tests).
+// (Un padre no puede ser SUCESOR: sus fechas son derivadas, la API lo rechaza.)
 
 import { addWorkingDays, subWorkingDays } from "./dates.ts";
-import { parseDependencies } from "./deps.ts";
+import { parseDependencies, type DepType } from "./deps.ts";
 
 export type CriticalTask = {
   id: number;
@@ -32,14 +38,60 @@ export function computeCriticalPath(tasks: CriticalTask[]): number[] {
   if (acts.length === 0) return [];
   const byId = new Map(acts.map((t) => [t.id, t]));
 
+  // Hijos por padre, para poder bajar de un padre a sus hojas.
+  const childrenOf = new Map<number, CriticalTask[]>();
+  for (const t of tasks) {
+    if (t.parentId == null) continue;
+    (childrenOf.get(t.parentId) ?? childrenOf.set(t.parentId, []).get(t.parentId)!).push(t);
+  }
+
+  /** Actividades hoja descendientes de `id` (a cualquier profundidad). */
+  const leafActivitiesUnder = (id: number): CriticalTask[] => {
+    const out: CriticalTask[] = [];
+    const walk = (pid: number) => {
+      for (const c of childrenOf.get(pid) ?? []) {
+        if (isLeaf(c.id)) {
+          const act = byId.get(c.id);
+          if (act) out.push(act);
+        } else {
+          walk(c.id);
+        }
+      }
+    };
+    walk(id);
+    return out;
+  };
+
+  /**
+   * Predecesores reales de una dependencia. Si apunta a una hoja, es ella misma; si
+   * apunta a un padre, son las hojas del subárbol que determinan la fecha que usa la
+   * dependencia (con empates, todas). El resto de los hijos conserva su holgura.
+   */
+  const resolvePreds = (predId: number, type: DepType): number[] => {
+    if (byId.has(predId)) return [predId];
+    const kids = leafActivitiesUnder(predId);
+    if (kids.length === 0) return []; // padre sin hojas con fechas, o id inexistente
+    if (type === "SS") {
+      // SS se ancla al INICIO del grupo → manda la hoja que empieza primero.
+      const min = kids.reduce((m, k) => (k.start! < m ? k.start! : m), kids[0].start!);
+      return kids.filter((k) => k.start!.getTime() === min.getTime()).map((k) => k.id);
+    }
+    // FS y FF se anclan al FIN del grupo → manda la hoja que termina último.
+    const max = kids.reduce((m, k) => (k.end! > m ? k.end! : m), kids[0].end!);
+    return kids.filter((k) => k.end!.getTime() === max.getTime()).map((k) => k.id);
+  };
+
   // Aristas predecesor→sucesor (solo entre actividades).
   const predsOf = new Map<number, Edge[]>(); // sucesor → [(pred, tipo)]
   const succsOf = new Map<number, Edge[]>(); // predecesor → [(succ, tipo)]
   for (const s of acts) {
     for (const d of parseDependencies(s.dependencies)) {
-      if (!byId.has(d.predId)) continue;
-      (predsOf.get(s.id) ?? predsOf.set(s.id, []).get(s.id)!).push({ other: d.predId, type: d.type });
-      (succsOf.get(d.predId) ?? succsOf.set(d.predId, []).get(d.predId)!).push({ other: s.id, type: d.type });
+      for (const predId of resolvePreds(d.predId, d.type)) {
+        // Una hoja que depende de su propio ancestro puede resolverse a sí misma.
+        if (predId === s.id) continue;
+        (predsOf.get(s.id) ?? predsOf.set(s.id, []).get(s.id)!).push({ other: predId, type: d.type });
+        (succsOf.get(predId) ?? succsOf.set(predId, []).get(predId)!).push({ other: s.id, type: d.type });
+      }
     }
   }
 
@@ -68,31 +120,35 @@ export function computeCriticalPath(tasks: CriticalTask[]): number[] {
     const t = byId.get(id)!;
     const succs = succsOf.get(id) ?? [];
 
+    // Restricción más tardía posible = el late start MÍNIMO entre los sucesores.
+    // Un sucesor todavía sin resolver (solo ocurre con ciclos) se ignora en vez de
+    // romper el cálculo.
+    let best: Date | null = null;
+    for (const e of succs) {
+      const lsS = LS.get(e.other);
+      const lfS = LF.get(e.other);
+      if (!lsS || !lfS) continue;
+      let cand: Date;
+      if (e.type === "SS") {
+        cand = lsS; // el sucesor no puede empezar antes que el predecesor
+      } else if (e.type === "FF") {
+        cand = subWorkingDays(lfS, off(t.durationDays)); // fin del pred ≤ fin del succ
+      } else {
+        // FS: el pred termina el día laborable anterior al inicio del succ
+        const lfP = subWorkingDays(lsS, 1);
+        cand = subWorkingDays(lfP, off(t.durationDays));
+      }
+      if (best === null || cand < best) best = cand;
+    }
+
     let ls: Date;
-    if (succs.length === 0) {
-      // Terminal: late finish = fin del proyecto.
+    if (best === null) {
+      // Terminal (sin sucesores utilizables): late finish = fin del proyecto.
       const lf = projectEnd;
       ls = subWorkingDays(lf, off(t.durationDays));
       LF.set(id, lf);
     } else {
-      // Restricción más tardía posible = el late start MÍNIMO entre los sucesores.
-      let best: Date | null = null;
-      for (const e of succs) {
-        const lsS = LS.get(e.other)!;
-        const lfS = LF.get(e.other)!;
-        let cand: Date;
-        if (e.type === "SS") {
-          cand = lsS; // el sucesor no puede empezar antes que el predecesor
-        } else if (e.type === "FF") {
-          cand = subWorkingDays(lfS, off(t.durationDays)); // fin del pred ≤ fin del succ
-        } else {
-          // FS: el pred termina el día laborable anterior al inicio del succ
-          const lfP = subWorkingDays(lsS, 1);
-          cand = subWorkingDays(lfP, off(t.durationDays));
-        }
-        if (best === null || cand < best) best = cand;
-      }
-      ls = best!;
+      ls = best;
       LF.set(id, addWorkingDays(ls, off(t.durationDays)));
     }
     LS.set(id, ls);
