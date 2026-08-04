@@ -12,7 +12,7 @@ Toda la aplicación corre en **Docker**. Ver [`SPEC.md`](./SPEC.md) para la espe
 - **Roll-up de padres**: Start/End/Duration de las filas resumen se calculan desde sus hijos.
 - **Milestones** (Duration 0) representados como rombo ◆.
 - **Diagrama de Gantt** con barras alineadas a las filas, escala **Day / Week / Month**, marcador de "hoy", flechas de dependencia (SVG) y scroll vertical sincronizado con el grid.
-- **Modal de detalle** (desde el link del ID) con editor de descripción rich-text guardado como Markdown.
+- **Modal de detalle** (desde el link del ID) con editor de descripción rich-text guardado como Markdown y botones **Guardar / Cancelar** (el modal no es autosave: descarta si cancelás).
 - Reordenar / indent / outdent / add / delete filas.
 
 > Estado: implementación **fase por fase** (ver [Roadmap](#roadmap)). Fases 1–4 completas.

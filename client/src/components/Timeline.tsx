@@ -162,7 +162,7 @@ export const Timeline = forwardRef<HTMLDivElement, { tasks: Task[] }>(function T
 
           {/* Marcador "hoy" */}
           {scale.todayX != null && (
-            <div className="tl-today" style={{ left: scale.todayX, height: bodyHeight }} title="Hoy" />
+            <div className="tl-today" style={{ left: scale.todayX, height: bodyHeight }} title="Today" />
           )}
 
           {/* Barras / milestones */}

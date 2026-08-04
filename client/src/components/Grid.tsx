@@ -66,7 +66,7 @@ export function Grid({ tasks }: { tasks: Task[] }) {
                   <button
                     type="button"
                     className="id-link"
-                    title="Abrir detalle"
+                    title="Open details"
                     onClick={(e) => {
                       e.stopPropagation();
                       openModal(t.id);
@@ -126,7 +126,7 @@ export function Grid({ tasks }: { tasks: Task[] }) {
                 <td className="col-deps">
                   <EditableText
                     value={t.dependencies ?? ""}
-                    placeholder="ej. 3FS"
+                    placeholder="e.g. 3FS"
                     onCommit={(v) => edit(t.id, { dependencies: v })}
                   />
                 </td>

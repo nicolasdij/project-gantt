@@ -28,7 +28,7 @@ export function NoticeModal() {
         <p className="confirm-message">{notice.message}</p>
         <div className="confirm-actions">
           <button className="btn btn-primary" onClick={dismiss} autoFocus>
-            Entendido
+            OK
           </button>
         </div>
       </div>

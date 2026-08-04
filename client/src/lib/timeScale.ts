@@ -5,7 +5,8 @@ import type { Zoom } from "../store.ts";
 import { DAY_WIDTH } from "./layout.ts";
 
 const DAY_MS = 86400000;
-const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+// Etiquetas de mes de la cabecera (UI en inglés).
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export type Tick = { label: string; x: number; width: number };
 
@@ -155,7 +156,7 @@ function forEachMonth(
       if (dj.getUTCFullYear() !== y || dj.getUTCMonth() !== m) break;
       j++;
     }
-    emit(`${MESES[m]} ${y}`, i * dayWidth, (j - i) * dayWidth);
+    emit(`${MONTHS[m]} ${y}`, i * dayWidth, (j - i) * dayWidth);
     i = j;
   }
 }

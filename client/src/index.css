@@ -461,6 +461,21 @@ table.grid {
   font-size: 12px;
   color: var(--muted);
 }
+/* Acciones del modal: pegadas al pie mientras se hace scroll del contenido. */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+}
+.modal-footer .btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 
 /* ---------- Confirm dialog ---------- */
 .confirm-dialog {

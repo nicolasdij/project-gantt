@@ -37,12 +37,12 @@ export function Toolbar() {
   return (
     <div className="toolbar">
       <div className="tb-group">
-        <button className="tb-btn" title="Añadir fila" onClick={addRow}>
+        <button className="tb-btn" title="Add row" onClick={addRow}>
           ➕
         </button>
         <button
           className="tb-btn"
-          title="Borrar fila"
+          title="Delete row"
           onClick={() => setConfirmingDelete(true)}
           disabled={!hasSel}
         >
@@ -53,7 +53,7 @@ export function Toolbar() {
       <div className="tb-group">
         <button
           className="tb-btn"
-          title="Indentar (hacer hijo)"
+          title="Indent (make child)"
           onClick={() => hasSel && indent.mutate(selectedId!)}
           disabled={!hasSel}
         >
@@ -61,7 +61,7 @@ export function Toolbar() {
         </button>
         <button
           className="tb-btn"
-          title="Outdentar (subir nivel)"
+          title="Outdent (move up a level)"
           onClick={() => hasSel && outdent.mutate(selectedId!)}
           disabled={!hasSel}
         >
@@ -72,7 +72,7 @@ export function Toolbar() {
       <div className="tb-group">
         <button
           className="tb-btn"
-          title="Mover arriba"
+          title="Move up"
           onClick={() => hasSel && move.mutate({ id: selectedId!, direction: "up" })}
           disabled={!hasSel}
         >
@@ -80,7 +80,7 @@ export function Toolbar() {
         </button>
         <button
           className="tb-btn"
-          title="Mover abajo"
+          title="Move down"
           onClick={() => hasSel && move.mutate({ id: selectedId!, direction: "down" })}
           disabled={!hasSel}
         >
@@ -91,7 +91,7 @@ export function Toolbar() {
       <div className="tb-group">
         <button
           className={`tb-btn ${showCritical ? "tb-active" : ""}`}
-          title="Camino crítico"
+          title="Critical path"
           aria-pressed={showCritical}
           onClick={toggleCritical}
         >
@@ -102,21 +102,21 @@ export function Toolbar() {
       <div className="tb-group">
         <button
           className={`tb-btn tb-zoom ${zoom === "day" ? "tb-active" : ""}`}
-          title="Zoom día"
+          title="Zoom: day"
           onClick={() => setZoom("day")}
         >
           Day
         </button>
         <button
           className={`tb-btn tb-zoom ${zoom === "week" ? "tb-active" : ""}`}
-          title="Zoom semana"
+          title="Zoom: week"
           onClick={() => setZoom("week")}
         >
           Week
         </button>
         <button
           className={`tb-btn tb-zoom ${zoom === "month" ? "tb-active" : ""}`}
-          title="Zoom mes"
+          title="Zoom: month"
           onClick={() => setZoom("month")}
         >
           Month
@@ -124,17 +124,17 @@ export function Toolbar() {
       </div>
 
       <div className="tb-spacer" />
-      <div className="save-indicator">{saving > 0 ? "Guardando…" : "Guardado"}</div>
+      <div className="save-indicator">{saving > 0 ? "Saving…" : "Saved"}</div>
 
       {confirmingDelete && selectedTask && (
         <ConfirmDialog
-          title="Borrar fila"
+          title="Delete row"
           message={
             hasChildren
-              ? `Se borrará "${selectedTask.title || `ID ${selectedTask.id}`}" y todas sus subtareas. Esta acción no se puede deshacer.`
-              : `Se borrará "${selectedTask.title || `ID ${selectedTask.id}`}". Esta acción no se puede deshacer.`
+              ? `"${selectedTask.title || `ID ${selectedTask.id}`}" and all its subtasks will be deleted. This action cannot be undone.`
+              : `"${selectedTask.title || `ID ${selectedTask.id}`}" will be deleted. This action cannot be undone.`
           }
-          confirmLabel="Borrar"
+          confirmLabel="Delete"
           danger
           onConfirm={confirmDelete}
           onCancel={() => setConfirmingDelete(false)}

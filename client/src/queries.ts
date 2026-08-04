@@ -36,7 +36,7 @@ export function useTaskMutations() {
   const onError = (e: unknown) => {
     // Errores de negocio (ej. editar fecha de un padre → 409) se muestran en un
     // modal propio (nunca con alert()). Se accede al store fuera de React.
-    useUI.getState().showError(e instanceof Error ? e.message : "Error inesperado");
+    useUI.getState().showError(e instanceof Error ? e.message : "Unexpected error");
   };
 
   const patch = useMutation({

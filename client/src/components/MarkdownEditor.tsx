@@ -61,12 +61,12 @@ export function MarkdownEditor({ value, onChange }: Props) {
   return (
     <div className="md-editor">
       <div className="md-toolbar">
-        <Btn cmd="bold" label="B" title="Negrita" />
-        <Btn cmd="italic" label="I" title="Cursiva" />
-        <Btn cmd="underline" label="U" title="Subrayado" />
+        <Btn cmd="bold" label="B" title="Bold" />
+        <Btn cmd="italic" label="I" title="Italic" />
+        <Btn cmd="underline" label="U" title="Underline" />
         <span className="md-sep" />
-        <Btn cmd="insertUnorderedList" label="• Lista" title="Lista sin numerar" />
-        <Btn cmd="insertOrderedList" label="1. Lista" title="Lista numerada" />
+        <Btn cmd="insertUnorderedList" label="• List" title="Bulleted list" />
+        <Btn cmd="insertOrderedList" label="1. List" title="Numbered list" />
       </div>
       <div
         ref={ref}

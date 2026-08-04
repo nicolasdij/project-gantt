@@ -56,6 +56,7 @@ Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en u
 ### Campos solo en el modal (abierto desde el link del ID)
 - **Description:** editor rich text (negrita, cursiva, subrayado, listas numeradas y sin numerar). Se **guarda como Markdown**.
 - El modal también permite editar el resto de columnas visibles del panel izquierdo.
+- **Guardar / Cancelar:** el modal **no** es autosave (a diferencia del grid). Los cambios se acumulan en un borrador local; **Guardar** los envía en un único PATCH y cierra, **Cancelar** cierra descartándolos.
 
 ## Reglas de negocio
 - **Duration:** cuenta días laborables **inclusive** (Lunes→Viernes = 5d). Solo se ignoran sábados y domingos (sin feriados por ahora).
@@ -106,3 +107,4 @@ Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en u
    - Las columnas de **fin de semana** (sáb/dom) se muestran en **gris claro** en el panel derecho. ✅
    - El **rombo del milestone** se dibuja **centrado** dentro de la columna de su día. ✅
    - Notificaciones/errores por **modal propio** (nunca `alert()`/`confirm()` del navegador). ✅
+7. **Modal de detalle = formulario, no autosave:** el popup del ID tiene botones **Guardar** (envía los campos modificados en un solo PATCH y cierra) y **Cancelar** (cierra descartando). ✕, Escape y el click en el fondo equivalen a Cancelar. El grid sigue siendo autosave por celda. ✅

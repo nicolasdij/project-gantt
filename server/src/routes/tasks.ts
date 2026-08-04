@@ -56,7 +56,7 @@ export async function taskRoutes(app: FastifyInstance) {
     const id = Number((req.params as { id: string }).id);
     const tasks = await prisma.task.findMany({ orderBy: { order: "asc" } });
     const task = tasks.find((t) => t.id === id);
-    if (!task) return reply.code(404).send({ error: "Task no encontrada" });
+    if (!task) return reply.code(404).send({ error: "Task not found" });
     return toSeq(task, buildMaps(tasks).idToSeq);
   });
 
@@ -76,7 +76,7 @@ export async function taskRoutes(app: FastifyInstance) {
 
     if (body.afterId != null) {
       const after = await prisma.task.findUnique({ where: { id: body.afterId } });
-      if (!after) return reply.code(400).send({ error: "afterId no existe" });
+      if (!after) return reply.code(400).send({ error: "afterId does not exist" });
       newOrder = after.order + 1;
       if (body.parentId === undefined) parentId = after.parentId; // hermano por defecto
       // Hace hueco: desplaza las filas posteriores.
@@ -109,7 +109,7 @@ export async function taskRoutes(app: FastifyInstance) {
   app.patch("/api/tasks/:id", async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     const current = await prisma.task.findUnique({ where: { id } });
-    if (!current) return reply.code(404).send({ error: "Task no encontrada" });
+    if (!current) return reply.code(404).send({ error: "Task not found" });
 
     const body = (req.body ?? {}) as Record<string, unknown>;
     const data: Record<string, unknown> = {};
@@ -134,7 +134,7 @@ export async function taskRoutes(app: FastifyInstance) {
       if (await isParent(id)) {
         return reply
           .code(409)
-          .send({ error: "Start/End/Duration de una fila padre son calculados (no editables)" });
+          .send({ error: "Start/End/Duration of a parent row are rolled up from its children (not editable)" });
       }
       // Construye el edit SOLO con las claves presentes en el body: el motor de
       // recálculo usa Object.keys para saber qué campos se editaron.
@@ -159,7 +159,7 @@ export async function taskRoutes(app: FastifyInstance) {
     }
 
     if (Object.keys(data).length === 0) {
-      return reply.code(400).send({ error: "Ningún campo editable en el body" });
+      return reply.code(400).send({ error: "No editable field in the request body" });
     }
 
     await prisma.task.update({ where: { id }, data });
@@ -177,10 +177,10 @@ export async function taskRoutes(app: FastifyInstance) {
     const id = Number((req.params as { id: string }).id);
     const dir = ((req.body as { direction?: string })?.direction ?? "").toLowerCase();
     if (dir !== "up" && dir !== "down") {
-      return reply.code(400).send({ error: 'direction debe ser "up" o "down"' });
+      return reply.code(400).send({ error: 'direction must be "up" or "down"' });
     }
     const task = await prisma.task.findUnique({ where: { id } });
-    if (!task) return reply.code(404).send({ error: "Task no encontrada" });
+    if (!task) return reply.code(404).send({ error: "Task not found" });
 
     const sibs = await siblingsOf(task.parentId);
     const idx = sibs.findIndex((s) => s.id === id);
@@ -201,12 +201,12 @@ export async function taskRoutes(app: FastifyInstance) {
   app.post("/api/tasks/:id/indent", async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     const task = await prisma.task.findUnique({ where: { id } });
-    if (!task) return reply.code(404).send({ error: "Task no encontrada" });
+    if (!task) return reply.code(404).send({ error: "Task not found" });
 
     const sibs = await siblingsOf(task.parentId);
     const idx = sibs.findIndex((s) => s.id === id);
     if (idx <= 0) {
-      return reply.code(400).send({ error: "No hay hermano previo: no se puede indentar" });
+      return reply.code(400).send({ error: "No previous sibling: cannot indent" });
     }
     const newParent = sibs[idx - 1];
     // Se añade como último hijo del nuevo padre.
@@ -227,12 +227,12 @@ export async function taskRoutes(app: FastifyInstance) {
   app.post("/api/tasks/:id/outdent", async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     const task = await prisma.task.findUnique({ where: { id } });
-    if (!task) return reply.code(404).send({ error: "Task no encontrada" });
+    if (!task) return reply.code(404).send({ error: "Task not found" });
     if (task.parentId === null) {
-      return reply.code(400).send({ error: "Ya está en la raíz: no se puede outdentar" });
+      return reply.code(400).send({ error: "Already at root level: cannot outdent" });
     }
     const parent = await prisma.task.findUnique({ where: { id: task.parentId } });
-    if (!parent) return reply.code(500).send({ error: "Padre inconsistente" });
+    if (!parent) return reply.code(500).send({ error: "Inconsistent parent" });
 
     const grandparentId = parent.parentId; // puede ser null (nivel raíz)
     const groupSibs = await siblingsOf(grandparentId); // hermanos del padre
@@ -259,7 +259,7 @@ export async function taskRoutes(app: FastifyInstance) {
   app.delete("/api/tasks/:id", async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     const exists = await prisma.task.findUnique({ where: { id } });
-    if (!exists) return reply.code(404).send({ error: "Task no encontrada" });
+    if (!exists) return reply.code(404).send({ error: "Task not found" });
 
     await prisma.task.delete({ where: { id } });
     await recomputeProject();

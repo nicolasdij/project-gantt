@@ -98,7 +98,7 @@ export default function App() {
 
       <main className="app-main">
         <section className="panel panel-grid" ref={gridRef} style={gridStyle}>
-          {isLoading && <p className="state">Cargando…</p>}
+          {isLoading && <p className="state">Loading…</p>}
           {isError && <p className="state error">Error: {(error as Error)?.message}</p>}
           {tasks && <Grid tasks={tasks} />}
         </section>
@@ -110,7 +110,7 @@ export default function App() {
               onMouseDown={onSplitterDown}
               role="separator"
               aria-orientation="vertical"
-              title="Arrastrar para redimensionar"
+              title="Drag to resize"
             />
             <Timeline tasks={tasks} ref={timelineRef} />
           </>
