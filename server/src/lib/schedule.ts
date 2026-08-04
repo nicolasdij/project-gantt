@@ -14,7 +14,7 @@
 
 import { addWorkingDays, subWorkingDays, workingDaysBetween } from "./dates.ts";
 import { parseDependencies } from "./deps.ts";
-import { groupChildren } from "./tree.ts";
+import { groupChildren, makeIsAncestor } from "./tree.ts";
 
 export type ScheduleTask = {
   id: number;
@@ -48,6 +48,7 @@ export function computeSchedule(tasks: ScheduleTask[]): Map<number, ScheduledFie
   const childrenByParent = groupChildren(tasks);
   const isParent = (id: number) => (childrenByParent.get(id)?.length ?? 0) > 0;
   const roots = childrenByParent.get(null) ?? [];
+  const isAncestor = makeIsAncestor(tasks);
 
   // Estado efectivo por tarea, inicializado con los valores almacenados.
   const eff = new Map<number, Eff>();
@@ -86,6 +87,11 @@ export function computeSchedule(tasks: ScheduleTask[]): Map<number, ScheduledFie
       const dur = eff.get(t.id)!.dur;
       let impliedStart: Date | null = null;
       for (const d of deps) {
+        // Depender de un ANCESTRO es circular: sus fechas son el roll-up de esta misma
+        // tarea, así que cada iteración la empujaría más lejos (el punto fijo diverge
+        // y el resultado dependería del tope de iteraciones). La API lo rechaza; acá
+        // se ignora por si el dato ya existía.
+        if (isAncestor(d.predId, t.id)) continue;
         const p = eff.get(d.predId);
         if (!p || !p.start || !p.end) continue; // predecesor inexistente o sin fechas
         let s: Date;
@@ -105,6 +111,13 @@ export function computeSchedule(tasks: ScheduleTask[]): Map<number, ScheduledFie
     }
     return changed;
   };
+
+  // Roll-up ANTES de la primera pasada: las fechas de los padres que vienen de la base
+  // pueden estar desactualizadas respecto de sus hijos (el hijo que acaba de editarse
+  // ya está guardado, el padre todavía no). Si se programara con esas fechas viejas y
+  // esa pasada no cambiara nada, el bucle cortaría y las hojas que dependen del padre
+  // se quedarían con la fecha vieja hasta la mutación siguiente.
+  rollupAll();
 
   // Punto fijo: alterna scheduling y roll-up hasta estabilizar (tope = nº tareas + 2).
   const maxIter = tasks.length + 2;

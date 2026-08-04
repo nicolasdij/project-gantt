@@ -6,7 +6,8 @@ import { prisma } from "../db.ts";
 import { recalcDates } from "../lib/recalc.ts";
 import { recomputeProject, isParent } from "../services/project.ts";
 import { computeCriticalPath, type CriticalTask } from "../lib/critical.ts";
-import { remapDependencies } from "../lib/deps.ts";
+import { parseDependencies, remapDependencies } from "../lib/deps.ts";
+import { makeIsAncestor } from "../lib/tree.ts";
 
 // Campos de contenido editables directamente (no disparan recálculo de fechas).
 const CONTENT_FIELDS = ["title", "owner", "descriptionMd"] as const;
@@ -140,9 +141,21 @@ export async function taskRoutes(app: FastifyInstance) {
     // Dependencies: llegan en ID VISIBLE (seq) → traducir a id interno antes de guardar.
     if (touchesDeps) {
       const all = await prisma.task.findMany();
-      const { seqToId } = buildMaps(all);
+      const { seqToId, idToSeq } = buildMaps(all);
       const raw = body.dependencies == null ? "" : String(body.dependencies);
-      data.dependencies = remapDependencies(raw, seqToId);
+      const internal = remapDependencies(raw, seqToId);
+
+      // Una fila no puede depender de un ANCESTRO: las fechas del ancestro son el
+      // roll-up de esta misma fila, así que la restricción es circular (el scheduler
+      // se iría empujando la fila en cada iteración).
+      const isAncestor = makeIsAncestor(all);
+      const circular = parseDependencies(internal).find((d) => isAncestor(d.predId, id));
+      if (circular) {
+        return reply.code(409).send({
+          error: `A row cannot depend on ID ${idToSeq.get(circular.predId)}: that row is its parent (or an ancestor), and its dates are rolled up from this one.`,
+        });
+      }
+      data.dependencies = internal;
     }
 
     // Campos de fecha: pasan por el motor de recálculo.
@@ -220,6 +233,27 @@ export async function taskRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "No previous sibling: cannot indent" });
     }
     const newParent = sibs[idx - 1];
+
+    // Indentar cambia los ancestros de toda la rama, así que puede volver circular una
+    // dependencia existente sin tocar el campo: si la fila (o alguna descendiente)
+    // depende del nuevo padre o de un ancestro suyo, se rechaza en vez de dejar el
+    // dato en un estado inválido o borrarlo por su cuenta.
+    const all = await prisma.task.findMany();
+    const isAncestor = makeIsAncestor(all);
+    const { idToSeq } = buildMaps(all);
+    const inMovedBranch = (t: { id: number }) => t.id === id || isAncestor(id, t.id);
+    const becomesAncestor = (predId: number) =>
+      predId === newParent.id || isAncestor(predId, newParent.id);
+    for (const t of all) {
+      if (!inMovedBranch(t)) continue;
+      const circular = parseDependencies(t.dependencies).find((d) => becomesAncestor(d.predId));
+      if (circular) {
+        return reply.code(409).send({
+          error: `Cannot indent: "${t.title || `ID ${idToSeq.get(t.id)}`}" depends on ID ${idToSeq.get(circular.predId)}, which would become its parent (or ancestor). Remove that dependency first.`,
+        });
+      }
+    }
+
     // Se añade como último hijo del nuevo padre.
     const lastChild = await prisma.task.findFirst({
       where: { parentId: newParent.id },

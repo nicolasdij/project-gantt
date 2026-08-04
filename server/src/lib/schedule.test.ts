@@ -104,3 +104,58 @@ test("varias dependencias: toma la restricción más tardía", () => {
   // Debe empezar tras el más tardío (fin de 2 = 11 → 12)
   assert.equal(iso(r.get(3)!.start), "2026-08-12");
 });
+
+test("una fila NO puede depender de su propio padre: la dependencia se ignora", () => {
+  // Es circular: el fin del padre es el roll-up de este mismo hijo, así que aplicarla
+  // empujaba al hijo en CADA iteración del punto fijo (el resultado terminaba
+  // dependiendo del tope de iteraciones, o sea del tamaño del proyecto).
+  const tasks = [
+    task({ id: 1, parentId: null, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }), // padre
+    task({ id: 2, parentId: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5, dependencies: "1FS" }),
+    task({ id: 3, parentId: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(2)!.start), "2026-08-03"); // el hijo se queda donde estaba
+  assert.equal(iso(r.get(2)!.end), "2026-08-07");
+  assert.equal(iso(r.get(1)!.end), "2026-08-07"); // y el padre no infla su duración
+  assert.equal(r.get(1)!.durationDays, 5);
+});
+
+test("tampoco puede depender de un ABUELO", () => {
+  const tasks = [
+    task({ id: 1, parentId: null, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+    task({ id: 2, parentId: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+    task({ id: 3, parentId: 2, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5, dependencies: "1FS" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(3)!.start), "2026-08-03");
+  assert.equal(iso(r.get(3)!.end), "2026-08-07");
+});
+
+test("una dependencia a un padre AJENO sigue funcionando", () => {
+  // Control: el bloqueo es solo para ancestros propios, no para cualquier padre.
+  const tasks = [
+    task({ id: 1, parentId: null, durationDays: 0 }), // padre ajeno
+    task({ id: 2, parentId: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+    task({ id: 3, parentId: null, durationDays: 5, dependencies: "1FS" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(3)!.start), "2026-08-10"); // tras el fin del grupo (07-ago)
+});
+
+test("una hoja que depende de un padre sigue su roll-up NUEVO, no el persistido", () => {
+  // Estado tal como queda en la base justo después de alargar el hijo (id 2) hasta el
+  // 14: el padre todavía tiene su fin viejo (07) guardado y L es coherente con ese fin
+  // viejo. Antes se programaba con la fecha vieja del padre y, como esa pasada no
+  // cambiaba nada, el punto fijo cortaba y L quedaba desfasada hasta la mutación
+  // siguiente (superpuesta al grupo al que debe seguir).
+  const tasks = [
+    task({ id: 1, parentId: null, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+    task({ id: 2, parentId: 1, start: D("2026-08-03"), end: D("2026-08-14"), durationDays: 10 }),
+    task({ id: 3, parentId: null, start: D("2026-08-10"), end: D("2026-08-14"), durationDays: 5, dependencies: "1FS" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(1)!.end), "2026-08-14"); // roll-up nuevo del padre
+  assert.equal(iso(r.get(3)!.start), "2026-08-17"); // L arranca tras el fin nuevo
+  assert.equal(iso(r.get(3)!.end), "2026-08-21");
+});

@@ -66,6 +66,7 @@ Regla aplicada: **un proceso por contenedor**. Meter Postgres + Node + Vite en u
   - Editar **Duration** → recalcula **End Date** (usando Start + días laborables).
   - Editar **Start Date** → recalcula **End Date** (manteniendo Duration).
 - **Filas padre (resumen):** Start/End/Duration se **calculan automáticamente** desde los hijos (start = mín de hijos, end = máx de hijos) → **no editables** en padres. Tampoco admiten **Dependencies**: son la entrada del scheduling, que solo programa hojas (la dependencia va en el primer hijo del grupo).
+- **Nada de dependencias circulares hacia arriba:** una fila no puede depender de un **ancestro** (su padre, su abuelo…), porque las fechas del ancestro son el roll-up de esa misma fila. La API responde `409`, y también rechaza un **indent** que volvería circular una dependencia ya existente (en la fila movida o en cualquiera de sus descendientes), en vez de borrar el dato por su cuenta.
 
 ## Timeline (panel derecho)
 - Barras horizontales alineadas con las filas del grid.

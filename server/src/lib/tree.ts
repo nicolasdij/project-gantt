@@ -16,6 +16,26 @@ export type StructureFields = {
   isParent: boolean;
 };
 
+/**
+ * Devuelve `esAncestro(candidato, id)`: si `candidato` es padre, abuelo, … de `id`.
+ * Se usa para rechazar dependencias circulares (una fila no puede depender de un
+ * ancestro, porque las fechas del ancestro se derivan de ella).
+ * Construye el mapa una sola vez, para consultas repetidas.
+ */
+export function makeIsAncestor(tasks: { id: number; parentId: number | null }[]) {
+  const parentOf = new Map(tasks.map((t) => [t.id, t.parentId]));
+  return (candidate: number, id: number): boolean => {
+    const seen = new Set<number>([id]); // guarda contra datos con ciclos de jerarquía
+    let p = parentOf.get(id) ?? null;
+    while (p != null && !seen.has(p)) {
+      if (p === candidate) return true;
+      seen.add(p);
+      p = parentOf.get(p) ?? null;
+    }
+    return false;
+  };
+}
+
 /** Agrupa hijos por padre y ordena cada grupo por `order`. */
 export function groupChildren<T extends TreeTask>(tasks: T[]): Map<number | null, T[]> {
   const byParent = new Map<number | null, T[]>();
