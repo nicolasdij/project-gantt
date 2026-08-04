@@ -159,3 +159,83 @@ test("una hoja que depende de un padre sigue su roll-up NUEVO, no el persistido"
   assert.equal(iso(r.get(3)!.start), "2026-08-17"); // L arranca tras el fin nuevo
   assert.equal(iso(r.get(3)!.end), "2026-08-21");
 });
+
+test("auto-dependencia: la fila se apunta a sí misma → se ignora", () => {
+  // Aplicarla empujaba la fila en cada iteración del punto fijo, y el resultado
+  // terminaba dependiendo del tope de iteraciones (o sea, del tamaño del proyecto).
+  const tasks = [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5, dependencies: "1FS" }),
+    task({ id: 2, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(1)!.start), "2026-08-03");
+  assert.equal(iso(r.get(1)!.end), "2026-08-07");
+});
+
+test("ciclo entre dos hojas: las dos conservan sus fechas", () => {
+  const tasks = [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5, dependencies: "2FS" }),
+    task({ id: 2, start: D("2026-08-10"), end: D("2026-08-14"), durationDays: 5, dependencies: "1FS" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(1)!.start), "2026-08-03");
+  assert.equal(iso(r.get(2)!.start), "2026-08-10");
+});
+
+test("el resultado de un ciclo NO depende del tamaño del proyecto", () => {
+  // Era el síntoma del bug: el punto fijo cortaba por `nº tareas + 2`, así que agregar
+  // filas sueltas movía las fechas de las tareas del ciclo.
+  const cycle = () => [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5, dependencies: "2FS" }),
+    task({ id: 2, start: D("2026-08-10"), end: D("2026-08-14"), durationDays: 5, dependencies: "1FS" }),
+  ];
+  const relleno = (n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      task({ id: 100 + i, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+    );
+  const chico = computeSchedule([...cycle(), ...relleno(1)]);
+  const grande = computeSchedule([...cycle(), ...relleno(20)]);
+  assert.equal(iso(chico.get(1)!.start), iso(grande.get(1)!.start));
+  assert.equal(iso(chico.get(2)!.start), iso(grande.get(2)!.start));
+});
+
+test("ciclo de tres hojas: se ignoran las tres dependencias", () => {
+  const tasks = [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5, dependencies: "3FS" }),
+    task({ id: 2, start: D("2026-08-10"), end: D("2026-08-14"), durationDays: 5, dependencies: "1FS" }),
+    task({ id: 3, start: D("2026-08-17"), end: D("2026-08-21"), durationDays: 5, dependencies: "2FS" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(1)!.start), "2026-08-03");
+  assert.equal(iso(r.get(2)!.start), "2026-08-10");
+  assert.equal(iso(r.get(3)!.start), "2026-08-17");
+});
+
+test("ciclo a través del roll-up de un padre: también se corta", () => {
+  // X depende del padre P, y el hijo C de P depende de X: el fin de P sale de C, que
+  // sale de X, que sale de P. El ciclo pasa por la arista de roll-up.
+  const tasks = [
+    task({ id: 1, parentId: null, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }), // P
+    task({ id: 2, parentId: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5, dependencies: "3FS" }), // C
+    task({ id: 3, start: D("2026-08-10"), end: D("2026-08-14"), durationDays: 5, dependencies: "1FS" }), // X
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(2)!.start), "2026-08-03");
+  assert.equal(iso(r.get(3)!.start), "2026-08-10");
+  assert.equal(iso(r.get(1)!.end), "2026-08-07"); // el padre no infla su duración
+});
+
+test("un diamante NO es un ciclo: sigue programando", () => {
+  // A→B, A→C, B→D, C→D. Dos caminos que convergen no deben marcarse como ciclo.
+  const tasks = [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-04"), durationDays: 2 }),
+    task({ id: 2, durationDays: 3, dependencies: "1FS" }),
+    task({ id: 3, durationDays: 5, dependencies: "1FS" }),
+    task({ id: 4, durationDays: 2, dependencies: "2FS, 3FS" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(2)!.start), "2026-08-05");
+  assert.equal(iso(r.get(3)!.start), "2026-08-05");
+  // D arranca tras el más tardío de los dos (C termina 11-ago) → 12-ago
+  assert.equal(iso(r.get(4)!.start), "2026-08-12");
+});

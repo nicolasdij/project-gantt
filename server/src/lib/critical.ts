@@ -16,7 +16,7 @@
 // (Un padre no puede ser SUCESOR: sus fechas son derivadas, la API lo rechaza.)
 
 import { addWorkingDays, subWorkingDays } from "./dates.ts";
-import { parseDependencies, type DepType } from "./deps.ts";
+import { makeClosesCycle, parseDependencies, type DepType } from "./deps.ts";
 import { makeIsAncestor } from "./tree.ts";
 
 export type CriticalTask = {
@@ -86,11 +86,15 @@ export function computeCriticalPath(tasks: CriticalTask[]): number[] {
   const predsOf = new Map<number, Edge[]>(); // sucesor → [(pred, tipo)]
   const succsOf = new Map<number, Edge[]>(); // predecesor → [(succ, tipo)]
   const isAncestor = makeIsAncestor(tasks);
+  const closesCycle = makeClosesCycle(tasks);
   for (const s of acts) {
     for (const d of parseDependencies(s.dependencies)) {
       // Depender de un ancestro es circular (la API lo rechaza y el scheduler lo
       // ignora): acá también, para que los dos motores vean el mismo grafo.
       if (isAncestor(d.predId, s.id)) continue;
+      // Misma regla que el scheduler: una dependencia que cierra un ciclo se ignora,
+      // para que los dos motores vean el mismo grafo.
+      if (closesCycle(s.id, d.predId)) continue;
       for (const predId of resolvePreds(d.predId, d.type)) {
         if (predId === s.id) continue; // defensa: nunca una auto-arista
         (predsOf.get(s.id) ?? predsOf.set(s.id, []).get(s.id)!).push({ other: predId, type: d.type });

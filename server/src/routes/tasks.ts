@@ -6,7 +6,7 @@ import { prisma } from "../db.ts";
 import { recalcDates } from "../lib/recalc.ts";
 import { recomputeProject, isParent } from "../services/project.ts";
 import { computeCriticalPath, type CriticalTask } from "../lib/critical.ts";
-import { parseDependencies, remapDependencies } from "../lib/deps.ts";
+import { makeClosesCycle, parseDependencies, remapDependencies } from "../lib/deps.ts";
 import { makeIsAncestor } from "../lib/tree.ts";
 
 // Campos de contenido editables directamente (no disparan recálculo de fechas).
@@ -149,10 +149,27 @@ export async function taskRoutes(app: FastifyInstance) {
       // roll-up de esta misma fila, así que la restricción es circular (el scheduler
       // se iría empujando la fila en cada iteración).
       const isAncestor = makeIsAncestor(all);
-      const circular = parseDependencies(internal).find((d) => isAncestor(d.predId, id));
-      if (circular) {
+      const ancestorDep = parseDependencies(internal).find((d) => isAncestor(d.predId, id));
+      if (ancestorDep) {
         return reply.code(409).send({
-          error: `A row cannot depend on ID ${idToSeq.get(circular.predId)}: that row is its parent (or an ancestor), and its dates are rolled up from this one.`,
+          error: `A row cannot depend on ID ${idToSeq.get(ancestorDep.predId)}: that row is its parent (or an ancestor), and its dates are rolled up from this one.`,
+        });
+      }
+
+      // Y tampoco un CICLO: ni apuntarse a sí misma, ni depender de algo que ya depende
+      // de ella (directa o indirectamente). Aplicarlo hacía divergir el punto fijo del
+      // scheduler, que terminaba cortando por su tope de iteraciones: las fechas salían
+      // disparatadas y encima dependían del tamaño del proyecto. Se valida sobre el grafo
+      // con el valor candidato ya aplicado.
+      const candidate = all.map((t) => (t.id === id ? { ...t, dependencies: internal } : t));
+      const closesCycle = makeClosesCycle(candidate);
+      const cyclicDep = parseDependencies(internal).find((d) => closesCycle(id, d.predId));
+      if (cyclicDep) {
+        return reply.code(409).send({
+          error:
+            cyclicDep.predId === id
+              ? `A row cannot depend on itself (ID ${idToSeq.get(id)}).`
+              : `That dependency would be circular: ID ${idToSeq.get(cyclicDep.predId)} already depends on this row, directly or through other rows.`,
         });
       }
       data.dependencies = internal;
@@ -250,6 +267,22 @@ export async function taskRoutes(app: FastifyInstance) {
       if (circular) {
         return reply.code(409).send({
           error: `Cannot indent: "${t.title || `ID ${idToSeq.get(t.id)}`}" depends on ID ${idToSeq.get(circular.predId)}, which would become its parent (or ancestor). Remove that dependency first.`,
+        });
+      }
+    }
+
+    // El chequeo de arriba ve las dependencias DIRECTAS al nuevo ancestro. La arista de
+    // roll-up que agrega el indent también puede cerrar un ciclo de forma indirecta (X
+    // depende de Y, Y de B, y se indenta B bajo X), así que se revisa el grafo completo
+    // con el movimiento ya aplicado. Antes del indent no hay ciclos —la API los
+    // rechaza—, así que cualquiera que aparezca lo causa este movimiento.
+    const moved = all.map((t) => (t.id === id ? { ...t, parentId: newParent.id } : t));
+    const closesCycleAfter = makeClosesCycle(moved);
+    for (const t of moved) {
+      const cyclic = parseDependencies(t.dependencies).find((d) => closesCycleAfter(t.id, d.predId));
+      if (cyclic) {
+        return reply.code(409).send({
+          error: `Cannot indent: it would create a circular chain — "${t.title || `ID ${idToSeq.get(t.id)}`}" depends on ID ${idToSeq.get(cyclic.predId)}. Remove that dependency first.`,
         });
       }
     }

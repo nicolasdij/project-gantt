@@ -9,11 +9,12 @@
 // - Roll-up: los padres toman Start = mín(hijos), End = máx(hijos).
 //
 // Se resuelve por punto fijo (itera scheduling + roll-up hasta estabilizar), lo que
-// maneja cadenas de dependencias y predecesores que son padres. Con ciclos, corta
-// por el tope de iteraciones (deja las fechas donde quedaron, sin colgarse).
+// maneja cadenas de dependencias y predecesores que son padres. Las dependencias que
+// cierran un CICLO se ignoran (ver makeClosesCycle): son las que impedían converger, y
+// el resultado terminaba dependiendo del tope de iteraciones.
 
 import { addWorkingDays, subWorkingDays, workingDaysBetween } from "./dates.ts";
-import { parseDependencies } from "./deps.ts";
+import { makeClosesCycle, parseDependencies } from "./deps.ts";
 import { groupChildren, makeIsAncestor } from "./tree.ts";
 
 export type ScheduleTask = {
@@ -49,6 +50,7 @@ export function computeSchedule(tasks: ScheduleTask[]): Map<number, ScheduledFie
   const isParent = (id: number) => (childrenByParent.get(id)?.length ?? 0) > 0;
   const roots = childrenByParent.get(null) ?? [];
   const isAncestor = makeIsAncestor(tasks);
+  const closesCycle = makeClosesCycle(tasks);
 
   // Estado efectivo por tarea, inicializado con los valores almacenados.
   const eff = new Map<number, Eff>();
@@ -92,6 +94,11 @@ export function computeSchedule(tasks: ScheduleTask[]): Map<number, ScheduledFie
         // y el resultado dependería del tope de iteraciones). La API lo rechaza; acá
         // se ignora por si el dato ya existía.
         if (isAncestor(d.predId, t.id)) continue;
+        // Dependencia que forma parte de un CICLO (incluido depender de sí misma):
+        // aplicarla haría divergir el punto fijo, empujando las fechas en cada
+        // iteración. Se ignora, así la tarea conserva sus fechas. La API la rechaza;
+        // esto es para datos que ya existieran.
+        if (closesCycle(t.id, d.predId)) continue;
         const p = eff.get(d.predId);
         if (!p || !p.start || !p.end) continue; // predecesor inexistente o sin fechas
         let s: Date;
