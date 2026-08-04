@@ -1,6 +1,13 @@
 // Estado de UI (no de datos: los datos viven en React Query).
 import { create } from "zustand";
-import { DATE_FORMATS, DEFAULT_DATE_FORMAT, type DateFormat } from "./lib/format.ts";
+import {
+  DATE_FORMATS,
+  DEFAULT_DATE_FORMAT,
+  DEFAULT_WORKING_DAYS_PER_MONTH,
+  WORKING_DAYS_PER_MONTH_OPTIONS,
+  type DateFormat,
+  type WorkingDaysPerMonth,
+} from "./lib/format.ts";
 
 export type Notice = { kind: "error" | "info"; title: string; message: string };
 export type Zoom = "day" | "week" | "month";
@@ -9,6 +16,7 @@ export type Zoom = "day" | "week" | "month";
 // dibujan las fechas), no del proyecto, y la app no tiene usuarios ni sesión donde
 // colgarlas server-side.
 const DATE_FORMAT_KEY = "gantt.dateFormat";
+const DAYS_PER_MONTH_KEY = "gantt.workingDaysPerMonth";
 
 function loadDateFormat(): DateFormat {
   try {
@@ -18,6 +26,18 @@ function loadDateFormat(): DateFormat {
     /* localStorage bloqueado (modo privado): se usa el default */
   }
   return DEFAULT_DATE_FORMAT;
+}
+
+function loadWorkingDaysPerMonth(): WorkingDaysPerMonth {
+  try {
+    const saved = Number(localStorage.getItem(DAYS_PER_MONTH_KEY));
+    if ((WORKING_DAYS_PER_MONTH_OPTIONS as readonly number[]).includes(saved)) {
+      return saved as WorkingDaysPerMonth;
+    }
+  } catch {
+    /* localStorage bloqueado (modo privado): se usa el default */
+  }
+  return DEFAULT_WORKING_DAYS_PER_MONTH;
 }
 
 type UIState = {
@@ -40,6 +60,8 @@ type UIState = {
   closeSettings: () => void;
   dateFormat: DateFormat;
   setDateFormat: (format: DateFormat) => void;
+  workingDaysPerMonth: WorkingDaysPerMonth;
+  setWorkingDaysPerMonth: (days: WorkingDaysPerMonth) => void;
   showCritical: boolean;
   toggleCritical: () => void;
   // Notificaciones (errores/avisos) mostradas como modal propio, nunca con alert().
@@ -71,6 +93,15 @@ export const useUI = create<UIState>((set) => ({
       /* localStorage bloqueado: la preferencia vale solo para esta sesión */
     }
     set({ dateFormat });
+  },
+  workingDaysPerMonth: loadWorkingDaysPerMonth(),
+  setWorkingDaysPerMonth: (workingDaysPerMonth) => {
+    try {
+      localStorage.setItem(DAYS_PER_MONTH_KEY, String(workingDaysPerMonth));
+    } catch {
+      /* localStorage bloqueado: la preferencia vale solo para esta sesión */
+    }
+    set({ workingDaysPerMonth });
   },
   showCritical: false,
   toggleCritical: () => set((s) => ({ showCritical: !s.showCritical })),

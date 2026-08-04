@@ -7,13 +7,13 @@ The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the ful
 ## Features
 
 - **Editable grid** with hierarchy (WBS 1, 1.1, 1.2.1), inline editing and autosave.
-- **Date recalculation** Start ↔ End ↔ Duration in working days (Mon–Fri; no holidays).
+- **Date recalculation** Start ↔ End ↔ Duration in working days (Mon–Fri; no holidays). Duration accepts `5d`, `2w` and `1m` (`1w` = 5 days; `1m` = the working days per month set in Settings).
 - **Auto-scheduling from dependencies** (MS Project style): FS, SS and FF. When a dependency is set or edited, the successor is rescheduled preserving its Duration.
 - **Parent roll-up**: Start/End/Duration of summary rows are computed from their children.
 - **Milestones** (Duration 0) drawn as a ◆ diamond.
 - **Gantt chart** with bars aligned to the rows, **Day / Week / Month** scale, a "today" marker, dependency arrows (SVG) and vertical scroll synchronized with the grid.
 - **Draggable bars**: dragging the **body** moves the whole task (Start and End together, preserving the Duration); dragging the **left** edge moves the Start and the **right** edge moves the End (there the Duration is recomputed). The resulting date snaps to the nearest working day.
-- **Settings** (⚙️ in the toolbar): a popup to configure app behaviour, with **Save / Cancel**. For now it holds the **date format** used by Start and End (5 common formats); the choice is stored in the browser.
+- **Settings** (⚙️ in the toolbar): a popup to configure app behaviour, with **Save / Cancel**. It holds the **date format** used by Start and End (5 common formats) and the **working days per month** (20/21/22) that `1m` means in the Duration field. Both are stored in the browser.
 - **Detail modal** (from the ID link) with a rich-text description editor stored as Markdown and **Save / Cancel** buttons (the modal is not autosave: cancelling discards).
 - Reorder / indent / outdent / add / delete rows.
 - **Discarding blank rows:** when the selection moves to another row, the one left behind is deleted if it ended up completely empty (no title, dates, owner, dependencies or description, and with the Duration untouched).

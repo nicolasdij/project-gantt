@@ -38,6 +38,7 @@ export function TaskModal() {
   const closeModal = useUI((s) => s.closeModal);
   const showError = useUI((s) => s.showError);
   const dateFormat = useUI((s) => s.dateFormat);
+  const daysPerMonth = useUI((s) => s.workingDaysPerMonth);
   const { data: tasks = [] } = useTasks();
   const { patch } = useTaskMutations();
 
@@ -109,7 +110,7 @@ export function TaskModal() {
       if (d.start !== base.start) data.start = d.start;
       if (d.end !== base.end) data.end = d.end;
       if (d.duration !== base.duration) {
-        const days = parseDuration(d.duration);
+        const days = parseDuration(d.duration, daysPerMonth);
         if (days == null) return null;
         data.durationDays = days;
       }
@@ -122,7 +123,7 @@ export function TaskModal() {
     const base = baseRef.current!;
     const data = buildPatch(d, base);
     if (!data) {
-      showError(`Invalid Duration: "${d.duration}". Use e.g. 5d or 2w.`);
+      showError(`Invalid Duration: "${d.duration}". Use e.g. 5d, 2w or 1m.`);
       return;
     }
     if (Object.keys(data).length === 0) {

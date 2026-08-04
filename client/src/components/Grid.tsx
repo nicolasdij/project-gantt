@@ -13,6 +13,7 @@ export function Grid({ tasks }: { tasks: Task[] }) {
   const select = useUI((s) => s.select);
   const openModal = useUI((s) => s.openModal);
   const dateFormat = useUI((s) => s.dateFormat);
+  const daysPerMonth = useUI((s) => s.workingDaysPerMonth);
   const focusTitleId = useUI((s) => s.focusTitleId);
   const clearTitleFocus = useUI((s) => s.clearTitleFocus);
   const { patch } = useTaskMutations();
@@ -117,8 +118,11 @@ export function Grid({ tasks }: { tasks: Task[] }) {
                       align="right"
                       value={formatDuration(t.durationDays)}
                       onCommit={(v) => {
-                        const days = parseDuration(v);
-                        if (days != null) edit(t.id, { durationDays: days });
+                        // "5d" / "2w" / "1m" / "7". Si no parsea se rechaza, y la
+                        // celda revierte en vez de dejar el texto inválido a la vista.
+                        const days = parseDuration(v, daysPerMonth);
+                        if (days == null) return false;
+                        edit(t.id, { durationDays: days });
                       }}
                     />
                   )}

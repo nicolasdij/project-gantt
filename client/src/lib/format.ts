@@ -5,16 +5,27 @@ export function formatDuration(days: number): string {
   return `${days}d`;
 }
 
+// Cuántos días laborables tiene un mes. Configurable en Settings porque no hay una
+// respuesta única (MS Project usa 20 por defecto; según la convención se usa 21 o 22).
+export const WORKING_DAYS_PER_MONTH_OPTIONS = [20, 21, 22] as const;
+export type WorkingDaysPerMonth = (typeof WORKING_DAYS_PER_MONTH_OPTIONS)[number];
+export const DEFAULT_WORKING_DAYS_PER_MONTH: WorkingDaysPerMonth = 20;
+
 /**
- * Parsea la entrada de Duration del usuario: "Nd" / "Nw" / "N".
- * 1w = 5 días laborables. Devuelve días como entero, o null si es inválida.
+ * Parsea la entrada de Duration del usuario: "Nd" / "Nw" / "Nm" / "N".
+ * 1w = 5 días laborables (una semana Lun-Vie, no configurable); 1m = los días
+ * laborables del mes definidos en Settings. Devuelve días como entero, o null si la
+ * entrada es inválida.
  */
-export function parseDuration(input: string): number | null {
-  const m = input.trim().toLowerCase().match(/^(\d+(?:[.,]\d+)?)\s*([dw])?$/);
+export function parseDuration(
+  input: string,
+  daysPerMonth: WorkingDaysPerMonth = DEFAULT_WORKING_DAYS_PER_MONTH,
+): number | null {
+  const m = input.trim().toLowerCase().match(/^(\d+(?:[.,]\d+)?)\s*([dwm])?$/);
   if (!m) return null;
   const n = parseFloat(m[1].replace(",", "."));
   const unit = m[2] ?? "d";
-  const days = unit === "w" ? n * 5 : n;
+  const days = unit === "w" ? n * 5 : unit === "m" ? n * daysPerMonth : n;
   return Math.max(0, Math.round(days));
 }
 

@@ -5,7 +5,12 @@ import { formatIsoAs, parseDateInput } from "../lib/format.ts";
 
 type TextProps = {
   value: string;
-  onCommit: (next: string) => void;
+  /**
+   * Confirma el valor. Devolver `false` significa RECHAZADO (el valor no se pudo
+   * interpretar): la celda revierte al valor anterior en vez de quedarse mostrando
+   * lo tipeado. Lo usa la celda Duration cuando la entrada no parsea.
+   */
+  onCommit: (next: string) => void | boolean;
   placeholder?: string;
   listId?: string; // para autocomplete (datalist)
   align?: "left" | "right" | "center";
@@ -39,7 +44,8 @@ export function EditableText({
   }, [autoFocus]);
 
   const commit = () => {
-    if (draft !== value) onCommit(draft);
+    if (draft === value) return;
+    if (onCommit(draft) === false) setDraft(value); // rechazado: revierte
   };
 
   return (
