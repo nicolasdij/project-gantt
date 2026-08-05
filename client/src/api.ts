@@ -20,7 +20,17 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export type PatchData = Partial<
-  Pick<Task, "title" | "start" | "end" | "durationDays" | "owner" | "dependencies" | "descriptionMd">
+  Pick<
+    Task,
+    | "title"
+    | "start"
+    | "end"
+    | "durationDays"
+    | "progress"
+    | "owner"
+    | "dependencies"
+    | "descriptionMd"
+  >
 >;
 
 export const api = {

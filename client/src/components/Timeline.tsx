@@ -31,6 +31,12 @@ type Drag = {
 const MS_SIZE = ROW_H / 2;
 const MS_HALF_DIAG = MS_SIZE * Math.SQRT1_2;
 
+// Aire que deja el relleno de avance por dentro de la barra (los mismos px arriba,
+// abajo y a la izquierda; el CSS pone los tres, acá se descuenta el ancho útil). El
+// relleno nunca toca el borde: por eso se lee como "barra con algo adentro" y no como
+// una barra de otro color.
+const FILL_INSET = 2;
+
 const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Timeline(
   { tasks },
   ref,
@@ -306,14 +312,23 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
             // Las filas padre tienen fechas calculadas desde los hijos: ni se
             // redimensionan ni se mueven.
             const draggable = !isParent;
+            // Relleno de avance: proporcional al % sobre el ancho ÚTIL de la barra (el
+            // que queda tras descontar el aire de los dos lados). En una barra muy
+            // angosta no queda ancho útil y no se dibuja nada.
+            const pct = Math.max(0, Math.min(100, t.progress));
+            const fillW = (Math.max(0, w - FILL_INSET * 2) * pct) / 100;
+            const label = pct > 0 ? `${t.title} — ${pct}% complete` : t.title;
             return (
               <div
                 key={`bar${t.id}`}
                 className={`tl-bar ${isParent ? "tl-bar-parent" : ""} ${draggable ? "tl-bar-draggable" : ""} ${critical ? "tl-critical" : ""}`}
                 style={{ left: g.startX, top: g.cy - barH / 2, width: w, height: barH }}
-                title={draggable ? `${t.title} — drag to move, drag an edge to resize` : t.title}
+                title={draggable ? `${label} — drag to move, drag an edge to resize` : label}
                 onMouseDown={draggable ? (e) => beginDrag(e, t, "move") : undefined}
               >
+                {/* Antes que los tiradores en el DOM: así el resaltado de los bordes
+                    al pasar el mouse sigue quedando por encima del relleno. */}
+                {fillW >= 1 && <span className="tl-bar-fill" style={{ width: fillW }} />}
                 {draggable && (
                   <>
                     <span

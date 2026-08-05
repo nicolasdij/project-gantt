@@ -4,7 +4,15 @@ import type { Task } from "../types.ts";
 import { useUI } from "../store.ts";
 import { useTaskMutations } from "../queries.ts";
 import { EditableText, EditableDate } from "./cells.tsx";
-import { formatDuration, parseDuration, isoToDate, formatIsoAs, wbsDepth } from "../lib/format.ts";
+import {
+  formatDuration,
+  parseDuration,
+  formatPercent,
+  parsePercent,
+  isoToDate,
+  formatIsoAs,
+  wbsDepth,
+} from "../lib/format.ts";
 
 const OWNERS_LIST_ID = "owners-autocomplete";
 
@@ -88,6 +96,7 @@ export function Grid({ tasks, titleWidth, onTitleResizeStart, titleResizing }: G
               Duration
             </th>
             <th className="col-deps">Dependencies</th>
+            <th className="col-progress">% Complete</th>
             <th className="col-owner">Owner</th>
           </tr>
         </thead>
@@ -182,6 +191,32 @@ export function Grid({ tasks, titleWidth, onTitleResizeStart, titleResizing }: G
                       value={t.dependencies ?? ""}
                       placeholder="e.g. 3FS"
                       onCommit={(v) => edit(t.id, { dependencies: v })}
+                    />
+                  )}
+                </td>
+
+                {/* % Complete: en un padre es calculado (promedio de los hijos
+                    ponderado por duración), como sus fechas. */}
+                <td className="col-progress">
+                  {isParent ? (
+                    <span
+                      className="ro num"
+                      title="A parent row's % Complete is rolled up from its children (a duration-weighted average). Set it on the children instead."
+                    >
+                      {formatPercent(t.progress)}
+                    </span>
+                  ) : (
+                    <EditableText
+                      align="right"
+                      value={formatPercent(t.progress)}
+                      placeholder="0%"
+                      onCommit={(v) => {
+                        // "40" / "40%". Si no parsea se rechaza y la celda revierte;
+                        // lo que se pasa de 100 se recorta (ver parsePercent).
+                        const pct = parsePercent(v);
+                        if (pct == null) return false;
+                        return edit(t.id, { progress: pct });
+                      }}
                     />
                   )}
                 </td>

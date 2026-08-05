@@ -1,5 +1,6 @@
 // Seed de ejemplo para Project Gantt.
-// Crea un proyecto pequeño con jerarquía (padres/hijos), dependencias y un milestone.
+// Crea un proyecto pequeño con jerarquía (padres/hijos), dependencias, avances
+// parciales y un milestone.
 // Nota: WBS y roll-up de padres se calcularán server-side en la Fase 2; aquí se dejan
 // valores iniciales coherentes para poder visualizar datos desde ya.
 
@@ -32,6 +33,7 @@ async function main() {
       end: d("2026-08-07"),
       durationDays: 5,
       owner: "Ana",
+      progress: 100,
     },
   });
 
@@ -45,6 +47,7 @@ async function main() {
       end: d("2026-08-14"),
       durationDays: 5,
       owner: "Ana",
+      progress: 60,
       // Empieza cuando termina "Toma de requisitos".
       dependencies: `${requirements.id}FS`,
     },
@@ -65,6 +68,7 @@ async function main() {
       end: d("2026-08-21"),
       durationDays: 5,
       owner: "Beto",
+      progress: 30,
       dependencies: "3FS", // tras "Diseño de solución" (id 3)
     },
   });

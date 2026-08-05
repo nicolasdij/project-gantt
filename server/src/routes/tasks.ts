@@ -8,6 +8,7 @@ import { recomputeProject, isParent } from "../services/project.ts";
 import { computeCriticalPath, type CriticalTask } from "../lib/critical.ts";
 import { makeClosesCycle, parseDependencies, remapDependencies } from "../lib/deps.ts";
 import { makeIsAncestor } from "../lib/tree.ts";
+import { clampPercent } from "../lib/progress.ts";
 
 // Campos de contenido editables directamente (no disparan recálculo de fechas).
 const CONTENT_FIELDS = ["title", "owner", "descriptionMd"] as const;
@@ -123,9 +124,26 @@ export async function taskRoutes(app: FastifyInstance) {
     // Las fechas de un padre son calculadas (roll-up de los hijos), y las
     // Dependencies son justamente la entrada del scheduling: en un padre no
     // significan nada (el scheduler solo programa hojas), así que tampoco se aceptan.
+    // El avance de un padre también es roll-up (promedio de los hijos ponderado por
+    // duración), así que tampoco se escribe a mano.
     const touchesDates = DATE_FIELDS.some((f) => f in body);
     const touchesDeps = "dependencies" in body;
-    const parent = touchesDates || touchesDeps ? await isParent(id) : false;
+    const touchesProgress = "progress" in body;
+    const parent =
+      touchesDates || touchesDeps || touchesProgress ? await isParent(id) : false;
+    if (parent && touchesProgress) {
+      return reply.code(409).send({
+        error:
+          "% Complete of a parent row is rolled up from its children (a duration-weighted average), so it is not editable. Set it on the children instead.",
+      });
+    }
+    if (touchesProgress) {
+      const n = Number(body.progress);
+      if (!Number.isFinite(n)) {
+        return reply.code(400).send({ error: "% Complete must be a number between 0 and 100" });
+      }
+      data.progress = clampPercent(n);
+    }
     if (parent && touchesDates) {
       return reply
         .code(409)

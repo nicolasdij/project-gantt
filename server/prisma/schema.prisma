@@ -37,6 +37,11 @@ model Task {
   // Milestone: caso especial cuando start == end (duración 0d), se dibuja como rombo.
   isMilestone   Boolean  @default(false)
 
+  // Avance (% completado), entero 0..100. En las hojas lo escribe el usuario; en los
+  // padres es CALCULADO (promedio de los hijos ponderado por duración) y se persiste,
+  // igual que las fechas de roll-up.
+  progress      Int      @default(0)
+
   // Un solo responsable.
   owner         String?
 

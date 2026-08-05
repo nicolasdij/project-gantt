@@ -29,6 +29,26 @@ export function parseDuration(
   return Math.max(0, Math.round(days));
 }
 
+// --- Avance (% Complete) ------------------------------------------------------
+
+/** Muestra el avance como "N%". */
+export function formatPercent(progress: number): string {
+  return `${progress}%`;
+}
+
+/**
+ * Parsea la entrada de % Complete: "40", "40%", "40,5%". Devuelve un entero 0..100,
+ * o null si la entrada no es un número (ahí la celda revierte, igual que Duration).
+ * Lo que se pasa de rango se RECORTA en vez de rechazarse: "150" es una intención
+ * clara ("terminado"), no un error de tipeo.
+ */
+export function parsePercent(input: string): number | null {
+  const m = input.trim().match(/^(\d+(?:[.,]\d+)?)\s*%?$/);
+  if (!m) return null;
+  const n = parseFloat(m[1].replace(",", "."));
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
 /** ISO → "YYYY-MM-DD" para inputs date y visualización. */
 export function isoToDate(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";

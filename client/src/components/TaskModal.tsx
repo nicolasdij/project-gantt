@@ -10,7 +10,14 @@ import { useUI } from "../store.ts";
 import { useTasks, useTaskMutations } from "../queries.ts";
 import { MarkdownEditor } from "./MarkdownEditor.tsx";
 import { EditableDate, useSelectAllOnFocus } from "./cells.tsx";
-import { formatDuration, parseDuration, isoToDate, formatIsoAs } from "../lib/format.ts";
+import {
+  formatDuration,
+  parseDuration,
+  formatPercent,
+  parsePercent,
+  isoToDate,
+  formatIsoAs,
+} from "../lib/format.ts";
 
 // Borrador: todo como string, tal cual se teclea (la Duration se parsea al guardar).
 type Draft = {
@@ -18,6 +25,7 @@ type Draft = {
   start: string; // YYYY-MM-DD o ""
   end: string; // YYYY-MM-DD o ""
   duration: string; // "Nd" / "Nw"
+  progress: string; // "40%" (se parsea al guardar)
   owner: string;
   dependencies: string;
   descriptionMd: string;
@@ -28,6 +36,7 @@ const draftOf = (task: Task): Draft => ({
   start: isoToDate(task.start),
   end: isoToDate(task.end),
   duration: formatDuration(task.durationDays),
+  progress: formatPercent(task.progress),
   owner: task.owner ?? "",
   dependencies: task.dependencies ?? "",
   descriptionMd: task.descriptionMd ?? "",
@@ -97,8 +106,12 @@ export function TaskModal() {
 
   if (!modalTaskId || !task || !draft) return null;
 
-  /** Diff del borrador contra la base. `null` si la Duration es inválida. */
-  const buildPatch = (d: Draft, base: Draft): PatchData | null => {
+  /**
+   * Diff del borrador contra la base, o el mensaje a mostrar si un campo tecleado no
+   * parsea (Duration y % Complete son texto libre). Devolver el mensaje —y no un
+   * `null`— evita que quien llama tenga que adivinar cuál de los dos falló.
+   */
+  const buildPatch = (d: Draft, base: Draft): { data: PatchData } | { error: string } => {
     const data: PatchData = {};
     if (d.title !== base.title) data.title = d.title;
     if (d.owner !== base.owner) data.owner = d.owner;
@@ -112,21 +125,33 @@ export function TaskModal() {
       if (d.end !== base.end) data.end = d.end;
       if (d.duration !== base.duration) {
         const days = parseDuration(d.duration, daysPerMonth);
-        if (days == null) return null;
+        if (days == null) {
+          return { error: `Invalid Duration: "${d.duration}". Use e.g. 5d, 2w or 1m.` };
+        }
         data.durationDays = days;
       }
+      // % Complete: en un padre es roll-up de los hijos (el server responde 409), así
+      // que va dentro de este mismo `if` y nunca se envía desde una fila padre.
+      if (d.progress !== base.progress) {
+        const pct = parsePercent(d.progress);
+        if (pct == null) {
+          return { error: `Invalid % Complete: "${d.progress}". Use a number from 0 to 100.` };
+        }
+        data.progress = pct;
+      }
     }
-    return data;
+    return { data };
   };
 
   const save = async () => {
     const d = draftRef.current!;
     const base = baseRef.current!;
-    const data = buildPatch(d, base);
-    if (!data) {
-      showError(`Invalid Duration: "${d.duration}". Use e.g. 5d, 2w or 1m.`);
+    const built = buildPatch(d, base);
+    if ("error" in built) {
+      showError(built.error);
       return;
     }
+    const { data } = built;
     if (Object.keys(data).length === 0) {
       closeModal(); // nada que guardar
       return;
@@ -222,6 +247,19 @@ export function TaskModal() {
               )}
             </label>
             <label className="field">
+              <span>% Complete</span>
+              {isParent ? (
+                <span className="ro">{draft.progress}</span>
+              ) : (
+                <input
+                  className="cell-input"
+                  value={draft.progress}
+                  {...selectAll}
+                  onChange={(e) => setField("progress", e.target.value)}
+                />
+              )}
+            </label>
+            <label className="field">
               <span>Owner</span>
               <input
                 className="cell-input"
@@ -234,8 +272,9 @@ export function TaskModal() {
 
           {isParent && (
             <p className="hint">
-              Start/End/Duration of a parent row are rolled up from its children (not editable),
-              so it cannot have dependencies either — set them on the first child instead.
+              Start/End/Duration and % Complete of a parent row are rolled up from its children
+              (not editable), so it cannot have dependencies either — set them on the first child
+              instead.
             </p>
           )}
 

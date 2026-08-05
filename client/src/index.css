@@ -165,6 +165,34 @@ body {
   background: #475569;
   border-radius: 2px;
 }
+/* Relleno de avance (% Complete): una barra interior más oscura, proporcional al
+   porcentaje. NO ocupa toda la barra: deja 2px de aire contra el borde por los cuatro
+   lados (el ancho lo calcula Timeline descontando ese margen; ver FILL_INSET), así se
+   sigue viendo la barra completa por detrás y el relleno se lee como algo adentro.
+   `pointer-events: none` para que arrastrar el cuerpo de la barra funcione igual
+   sobre la parte rellena. */
+.tl-bar-fill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  background: #1d4ed8;
+  border-radius: 2px;
+  pointer-events: none;
+}
+/* En cada variante de barra el relleno es la versión más oscura de su color, para que
+   el contraste se mantenga. El orden importa: el padre crítico va último porque su
+   selector empata en especificidad con el de la barra crítica. */
+.tl-bar-parent .tl-bar-fill {
+  background: #1e293b;
+  border-radius: 1px;
+}
+.tl-bar.tl-critical .tl-bar-fill {
+  background: #7f1d1d;
+}
+.tl-bar-parent.tl-critical .tl-bar-fill {
+  background: #450a0a;
+}
 /* El cuerpo de la barra se arrastra para mover Start y End juntos (los bordes
    redimensionan; ver .tl-bar-handle). En los padres no aplica: son roll-up. */
 .tl-bar-draggable {
@@ -410,6 +438,9 @@ table.grid {
 }
 .col-deps {
   width: 120px;
+}
+.col-progress {
+  width: 96px;
 }
 .num {
   text-align: right;

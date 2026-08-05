@@ -1,10 +1,12 @@
 // Servicio de proyecto: recalcula WBS + orden + fechas (auto-scheduling por
-// dependencias y roll-up de padres) y lo persiste. Se invoca tras cualquier mutación.
+// dependencias y roll-up de padres) + avance de los padres, y lo persiste. Se invoca
+// tras cualquier mutación.
 // El proyecto es único y pequeño: recalcular todo en cada cambio es simple y correcto.
 
 import { prisma } from "../db.ts";
 import { computeStructure, type TreeTask } from "../lib/tree.ts";
 import { computeSchedule, type ScheduleTask } from "../lib/schedule.ts";
+import { computeProgress } from "../lib/progress.ts";
 
 function sameDate(a: Date | null, b: Date | null): boolean {
   if (a === null || b === null) return a === b;
@@ -12,19 +14,31 @@ function sameDate(a: Date | null, b: Date | null): boolean {
 }
 
 /**
- * Recalcula estructura (WBS/orden) y fechas (scheduling + roll-up) de todo el
- * proyecto y guarda solo las filas cuyos campos calculados cambiaron.
+ * Recalcula estructura (WBS/orden), fechas (scheduling + roll-up) y avance (roll-up)
+ * de todo el proyecto y guarda solo las filas cuyos campos calculados cambiaron.
  */
 export async function recomputeProject(): Promise<number> {
   const tasks = await prisma.task.findMany();
   const structure = computeStructure(tasks as unknown as TreeTask[]);
   const schedule = computeSchedule(tasks as unknown as ScheduleTask[]);
+  // Después del scheduling: el avance de un padre pondera por la duración de cada
+  // hijo, y la que vale es la que acaba de calcularse (la de la base puede ser vieja).
+  const progress = computeProgress(
+    tasks.map((t) => ({
+      id: t.id,
+      parentId: t.parentId,
+      order: t.order,
+      progress: t.progress,
+      durationDays: schedule.get(t.id)?.durationDays ?? t.durationDays,
+    })),
+  );
 
   const updates: Promise<unknown>[] = [];
   for (const t of tasks) {
     const s = structure.get(t.id);
     const d = schedule.get(t.id);
-    if (!s || !d) continue;
+    const p = progress.get(t.id);
+    if (!s || !d || p == null) continue;
 
     const changed =
       s.wbs !== t.wbs ||
@@ -32,7 +46,8 @@ export async function recomputeProject(): Promise<number> {
       !sameDate(d.start, t.start) ||
       !sameDate(d.end, t.end) ||
       d.durationDays !== t.durationDays ||
-      d.isMilestone !== t.isMilestone;
+      d.isMilestone !== t.isMilestone ||
+      p !== t.progress;
 
     if (changed) {
       updates.push(
@@ -45,6 +60,7 @@ export async function recomputeProject(): Promise<number> {
             end: d.end,
             durationDays: d.durationDays,
             isMilestone: d.isMilestone,
+            progress: p,
           },
         }),
       );

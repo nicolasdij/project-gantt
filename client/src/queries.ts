@@ -39,6 +39,8 @@ function isBlankRow(t: Task): boolean {
     !t.start &&
     !t.end &&
     t.durationDays === NEW_ROW_DURATION_DAYS &&
+    // Un avance tipeado es contenido real (la fila nace en 0%).
+    t.progress === 0 &&
     !(t.owner ?? "").trim() &&
     !(t.dependencies ?? "").trim() &&
     // No está en el grid, pero una fila con descripción tiene contenido real.

@@ -7,11 +7,12 @@ The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the ful
 ## Features
 
 - **Editable grid** with hierarchy (WBS 1, 1.1, 1.2.1), inline editing and autosave. The **ID** column stays frozen when scrolling horizontally, and the **Title** column is resized by dragging the right edge of its header.
-- **Panel widths**: a draggable divider between grid and Gantt. On load the left panel reaches exactly **up to Duration** — Dependencies and Owner stay out of view so the Gantt gets the space; scroll the panel horizontally (or move the divider) to reach them.
+- **Panel widths**: a draggable divider between grid and Gantt. On load the left panel reaches exactly **up to Duration** — Dependencies, % Complete and Owner stay out of view so the Gantt gets the space; scroll the panel horizontally (or move the divider) to reach them.
 - **Date recalculation** Start ↔ End ↔ Duration in working days (Mon–Fri; no holidays). Duration accepts `5d`, `2w` and `1m` (`1w` = 5 days; `1m` = the working days per month set in Settings).
 - **Auto-scheduling from dependencies** (MS Project style): FS, SS and FF. When a dependency is set or edited, the successor is rescheduled preserving its Duration.
 - **No circular dependencies**: a row cannot depend on itself, on an ancestor, or on anything that already depends on it (directly or through other rows). The server answers `409`, an indent that would close a cycle is rejected too, and the cell goes back to its previous value.
-- **Parent roll-up**: Start/End/Duration of summary rows are computed from their children. Summary rows accept neither dates nor dependencies (both are derived).
+- **Parent roll-up**: Start/End/Duration **and % Complete** of summary rows are computed from their children (the percentage as an average weighted by each child's Duration). Summary rows accept neither dates nor dependencies (both are derived).
+- **% Complete**: a per-row progress column (`0`–`100`, typed as `40` or `40%`) that **fills the Gantt bar** from the left in proportion to it — in a darker shade of the bar's colour and leaving 2px of clearance from the border, so the whole bar still reads behind the fill.
 - **Critical path**: CPM toggle in the toolbar that paints the zero-slack bars red. A dependency on a summary row is translated to the leaves that actually drive its date.
 - **Milestones** (Duration 0) drawn as a ◆ diamond.
 - **Gantt chart** with bars aligned to the rows, **Day / Week / Month** scale, a "today" marker, dependency arrows (SVG) and vertical scroll synchronized with the grid.
@@ -20,7 +21,7 @@ The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the ful
 - **Detail modal** (from the ID link) with a rich-text description editor stored as Markdown and **Save / Cancel** buttons (the modal is not autosave: cancelling discards).
 - Reorder / indent / outdent / add / delete rows.
 - **Editing that gets out of the way**: focusing a field (with Tab or the mouse) selects all of its text, a new row focuses its Title, and a cell whose change the server rejects reverts instead of showing an unsaved value.
-- **Discarding blank rows:** when the selection moves to another row, the one left behind is deleted if it ended up completely empty (no title, dates, owner, dependencies or description, and with the Duration untouched).
+- **Discarding blank rows:** when the selection moves to another row, the one left behind is deleted if it ended up completely empty (no title, dates, owner, dependencies or description, % Complete at 0, and with the Duration untouched).
 
 > Status: **phase by phase** implementation (see [Roadmap](#roadmap)). Phases 1–6 complete.
 

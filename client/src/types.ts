@@ -8,6 +8,8 @@ export type Task = {
   end: string | null; // ISO
   durationDays: number;
   isMilestone: boolean;
+  /** Avance 0..100. En las filas padre es calculado (roll-up ponderado por duración). */
+  progress: number;
   owner: string | null;
   dependencies: string | null;
   descriptionMd: string | null;
@@ -19,6 +21,7 @@ export type EditableField =
   | "start"
   | "end"
   | "durationDays"
+  | "progress"
   | "owner"
   | "dependencies"
   | "descriptionMd";
