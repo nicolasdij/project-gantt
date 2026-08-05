@@ -59,7 +59,7 @@ Open **http://localhost:5173** in the browser.
 
 ### Load sample data (seed)
 
-The database starts empty. To load a sample project (7 tasks with hierarchy, dependencies and one milestone):
+The database starts empty. To load a sample project (7 tasks with hierarchy, dependencies, partial progress and one milestone):
 
 ```bash
 docker compose exec server npm run db:seed
@@ -94,8 +94,8 @@ project-gantt/
 ├─ server/                  Back-end (Fastify + Prisma + TS)
 │  ├─ src/
 │  │  ├─ routes/            task REST endpoints
-│  │  ├─ services/          recompute (WBS, scheduling, roll-up)
-│  │  └─ lib/               working days, dependencies, tree, schedule, critical path
+│  │  ├─ services/          recompute (WBS, scheduling, roll-up of dates and progress)
+│  │  └─ lib/               working days, dependencies, tree, schedule, progress, critical path
 │  ├─ prisma/
 │  │  ├─ schema.prisma      schema of the `tasks` table
 │  │  ├─ migrations/        migration history (versioned)
@@ -116,13 +116,13 @@ Base: `http://localhost:3000/api`
 | GET | `/tasks` | Ordered list of tasks (pre-order) |
 | GET | `/tasks/:id` | Detail of a task (404 if it doesn't exist) |
 | POST | `/tasks` | Creates a row. Body: `{ title?, parentId?, afterId? }` (`afterId` inserts below and inherits the parent) |
-| PATCH | `/tasks/:id` | **Autosave** per field (last-write-wins). Editing `start`/`end`/`durationDays`/`dependencies` triggers the recalculation. Returns `409` for: dates or dependencies on a parent row (both are derived, so the dependency belongs on the first child), and a dependency that is **circular** — on itself, on an ancestor, or on a row that already depends on this one |
+| PATCH | `/tasks/:id` | **Autosave** per field (last-write-wins). Editing `start`/`end`/`durationDays`/`dependencies` triggers the recalculation, and `progress` re-rolls it up the ancestors. Returns `409` for: dates, dependencies or `progress` on a parent row (all derived — the dependency belongs on the first child, the progress on the children), and a dependency that is **circular** — on itself, on an ancestor, or on a row that already depends on this one. `progress` outside 0–100 is clamped; a non-numeric one is `400` |
 | POST | `/tasks/:id/move` | Reorders among siblings. Body: `{ direction: "up" \| "down" }` |
 | POST | `/tasks/:id/indent` | Turns the row into a child of the previous sibling. `409` if the new parent–child edge would close a dependency cycle |
 | POST | `/tasks/:id/outdent` | Moves the row up one level |
 | DELETE | `/tasks/:id` | Deletes the row (children cascade) |
 
-After every mutation, the server recomputes **WBS + order**, applies the **dependency auto-scheduling** and the **parent roll-up**.
+After every mutation, the server recomputes **WBS + order**, applies the **dependency auto-scheduling** and the **parent roll-up** — dates (min/max of the children) and **% Complete** (their average weighted by Duration).
 
 ---
 
@@ -142,13 +142,13 @@ After every mutation, the server recomputes **WBS + order**, applies the **depen
 
 ## Tests
 
-Back-end unit tests (date utilities, dependency parsing, the scheduling engine — including the cycle rules — and the CPM):
+Back-end unit tests (date utilities, dependency parsing, the scheduling engine — including the cycle rules — the progress roll-up and the CPM):
 
 ```bash
 docker compose exec server npm test
 ```
 
-42 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
+50 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
 
 ---
 
