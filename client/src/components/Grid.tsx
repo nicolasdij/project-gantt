@@ -189,7 +189,7 @@ export function Grid({ tasks, titleWidth, onTitleResizeStart, titleResizing }: G
                   ) : (
                     <EditableText
                       value={t.dependencies ?? ""}
-                      placeholder="e.g. 3FS"
+                      placeholder="e.g. 3FS+1d"
                       onCommit={(v) => edit(t.id, { dependencies: v })}
                     />
                   )}

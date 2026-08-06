@@ -15,7 +15,7 @@
 // holgura y el camino crítico se cortaba ahí (ver tests).
 // (Un padre no puede ser SUCESOR: sus fechas son derivadas, la API lo rechaza.)
 
-import { addWorkingDays, subWorkingDays } from "./dates.ts";
+import { addWorkingDays, shiftWorkingDays, subWorkingDays } from "./dates.ts";
 import { makeClosesCycle, parseDependencies, type DepType } from "./deps.ts";
 import { makeIsAncestor } from "./tree.ts";
 
@@ -28,7 +28,10 @@ export type CriticalTask = {
   dependencies: string | null;
 };
 
-type Edge = { other: number; type: "FS" | "SS" | "FF" };
+// La arista lleva el LAG de la dependencia: el forward pass ya lo aplicó (las fechas
+// vienen del scheduler), pero el backward pass tiene que deshacerlo con el signo
+// INVERTIDO. Sin eso, un lag aparecía como holgura y el camino crítico se cortaba ahí.
+type Edge = { other: number; type: "FS" | "SS" | "FF"; lag: number };
 
 export function computeCriticalPath(tasks: CriticalTask[]): number[] {
   const parentIds = new Set(tasks.map((t) => t.parentId).filter((x): x is number => x != null));
@@ -97,8 +100,11 @@ export function computeCriticalPath(tasks: CriticalTask[]): number[] {
       if (closesCycle(s.id, d.predId)) continue;
       for (const predId of resolvePreds(d.predId, d.type)) {
         if (predId === s.id) continue; // defensa: nunca una auto-arista
-        (predsOf.get(s.id) ?? predsOf.set(s.id, []).get(s.id)!).push({ other: predId, type: d.type });
-        (succsOf.get(predId) ?? succsOf.set(predId, []).get(predId)!).push({ other: s.id, type: d.type });
+        // El lag viaja en la arista y se aplica DESPUÉS de resolver el predecesor: la
+        // traducción padre → hojas no lo toca (es la misma dependencia, un nodo más
+        // abajo), así que un "PadreFS+2d" mantiene sus 2 días en cada hoja resuelta.
+        (predsOf.get(s.id) ?? predsOf.set(s.id, []).get(s.id)!).push({ other: predId, type: d.type, lag: d.lag });
+        (succsOf.get(predId) ?? succsOf.set(predId, []).get(predId)!).push({ other: s.id, type: d.type, lag: d.lag });
       }
     }
   }
@@ -136,14 +142,20 @@ export function computeCriticalPath(tasks: CriticalTask[]): number[] {
       const lsS = LS.get(e.other);
       const lfS = LF.get(e.other);
       if (!lsS || !lfS) continue;
+      // El lag se descuenta (signo invertido) porque acá se va del sucesor HACIA el
+      // predecesor: si el sucesor arranca 2 días después del fin del pred, el late
+      // finish del pred está 2 días ANTES del late start del sucesor.
       let cand: Date;
       if (e.type === "SS") {
-        cand = lsS; // el sucesor no puede empezar antes que el predecesor
+        // el sucesor no puede empezar antes que el predecesor (+ lag)
+        cand = shiftWorkingDays(lsS, -e.lag);
       } else if (e.type === "FF") {
-        cand = subWorkingDays(lfS, off(t.durationDays)); // fin del pred ≤ fin del succ
+        // fin del pred (+ lag) ≤ fin del succ
+        const lfP = shiftWorkingDays(lfS, -e.lag);
+        cand = subWorkingDays(lfP, off(t.durationDays));
       } else {
-        // FS: el pred termina el día laborable anterior al inicio del succ
-        const lfP = subWorkingDays(lsS, 1);
+        // FS: el pred termina el día laborable anterior al inicio del succ (menos el lag)
+        const lfP = shiftWorkingDays(lsS, -(1 + e.lag));
         cand = subWorkingDays(lfP, off(t.durationDays));
       }
       if (best === null || cand < best) best = cand;

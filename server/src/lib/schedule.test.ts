@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { computeSchedule, type ScheduleTask } from "./schedule.ts";
-import { parseDependencies } from "./deps.ts";
+import {
+  formatDependency,
+  MAX_LAG_DAYS,
+  parseDependencies,
+  remapDependencies,
+} from "./deps.ts";
 
 const D = (s: string) => new Date(`${s}T00:00:00.000Z`);
 const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
@@ -19,15 +24,58 @@ const task = (p: Partial<ScheduleTask> & { id: number }): ScheduleTask => ({
 });
 
 test("parseDependencies: tipos, default FS, ignora SF", () => {
-  assert.deepEqual(parseDependencies("3FS"), [{ predId: 3, type: "FS" }]);
-  assert.deepEqual(parseDependencies("3"), [{ predId: 3, type: "FS" }]); // default FS
+  assert.deepEqual(parseDependencies("3FS"), [{ predId: 3, type: "FS", lag: 0 }]);
+  assert.deepEqual(parseDependencies("3"), [{ predId: 3, type: "FS", lag: 0 }]); // default FS
   assert.deepEqual(parseDependencies("5ss, 7ff"), [
-    { predId: 5, type: "SS" },
-    { predId: 7, type: "FF" },
+    { predId: 5, type: "SS", lag: 0 },
+    { predId: 7, type: "FF", lag: 0 },
   ]);
   assert.deepEqual(parseDependencies("3SF"), []); // SF fuera de alcance
   assert.deepEqual(parseDependencies(""), []);
   assert.deepEqual(parseDependencies(null), []);
+});
+
+test("parseDependencies: lag con signo, la 'd' y el tipo son opcionales", () => {
+  assert.deepEqual(parseDependencies("3FS+1d"), [{ predId: 3, type: "FS", lag: 1 }]);
+  assert.deepEqual(parseDependencies("3FS+1"), [{ predId: 3, type: "FS", lag: 1 }]); // sin 'd'
+  assert.deepEqual(parseDependencies("3+1d"), [{ predId: 3, type: "FS", lag: 1 }]); // sin tipo
+  assert.deepEqual(parseDependencies("3FS-2D"), [{ predId: 3, type: "FS", lag: -2 }]); // lead
+  assert.deepEqual(parseDependencies("5ss+3d, 7ff-1d"), [
+    { predId: 5, type: "SS", lag: 3 },
+    { predId: 7, type: "FF", lag: -1 },
+  ]);
+  assert.deepEqual(parseDependencies("3FS+0d"), [{ predId: 3, type: "FS", lag: 0 }]);
+  // Espacios alrededor del signo: el lag no se puede perder en un "3FS" a secas, que
+  // programaría igual ignorando lo que se pidió.
+  assert.deepEqual(parseDependencies("3FS + 1d"), [{ predId: 3, type: "FS", lag: 1 }]);
+  assert.deepEqual(parseDependencies("3FS -2"), [{ predId: 3, type: "FS", lag: -2 }]);
+  assert.deepEqual(parseDependencies("3FS+1d 5SS"), [
+    { predId: 3, type: "FS", lag: 1 },
+    { predId: 5, type: "SS", lag: 0 },
+  ]);
+  // Fuera de rango o malformado: se descarta el token entero, como cualquier basura.
+  assert.deepEqual(parseDependencies(`3FS+${MAX_LAG_DAYS + 1}d`), []);
+  assert.deepEqual(parseDependencies("3FS+1w"), []); // semanas: no soportadas
+  assert.deepEqual(parseDependencies("3FS+50%"), []); // porcentajes: fuera de alcance
+});
+
+test("formatDependency: round-trip, y el lag 0 no se escribe", () => {
+  const round = (s: string) => parseDependencies(s).map(formatDependency).join(", ");
+  assert.equal(round("3FS"), "3FS");
+  assert.equal(round("3"), "3FS"); // el default se hace explícito
+  assert.equal(round("3FS+0d"), "3FS"); // lag 0: no se escribe
+  assert.equal(round("3fs+2"), "3FS+2d"); // se normaliza a la forma canónica
+  assert.equal(round("5SS-1d, 7FF+3d"), "5SS-1d, 7FF+3d");
+});
+
+test("remapDependencies conserva el lag al traducir los IDs", () => {
+  // Es el camino que recorre TODA lectura y escritura de la API (id interno ↔ ID
+  // visible): si el serializador se olvidara del lag, cada ida y vuelta lo borraría.
+  const map = new Map([
+    [10, 1],
+    [20, 2],
+  ]);
+  assert.equal(remapDependencies("10FS+2d, 20SS-1d", map), "1FS+2d, 2SS-1d");
 });
 
 test("FS: el sucesor empieza el día laborable siguiente al fin del predecesor", () => {
@@ -58,6 +106,67 @@ test("FF: el sucesor termina a la vez que el predecesor", () => {
   const r = computeSchedule(tasks);
   assert.equal(iso(r.get(2)!.end), "2026-08-07");
   assert.equal(iso(r.get(2)!.start), "2026-08-05"); // 3 lab que terminan el Vie 07
+});
+
+test("FS+1d: el sucesor deja un día laborable libre tras el fin del predecesor", () => {
+  const tasks = [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+    task({ id: 2, durationDays: 5, dependencies: "1FS+1d" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(2)!.start), "2026-08-11"); // Mar 11, no el Lun 10 del FS pelado
+  assert.equal(iso(r.get(2)!.end), "2026-08-17");
+});
+
+test("el lag cuenta días LABORABLES: se saltea el fin de semana", () => {
+  const tasks = [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-06"), durationDays: 4 }), // fin Jue
+    task({ id: 2, durationDays: 3, dependencies: "1FS+1d" }),
+  ];
+  const r = computeSchedule(tasks);
+  // FS pelado daría Vie 07; el +1d salta el sábado y el domingo, no cae en Sáb 08.
+  assert.equal(iso(r.get(2)!.start), "2026-08-10");
+});
+
+test("FS-1d (lead): el sucesor solapa y arranca el día en que termina el pred", () => {
+  const tasks = [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+    task({ id: 2, durationDays: 5, dependencies: "1FS-1d" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(2)!.start), "2026-08-07"); // el mismo Vie que cierra el 1
+  assert.equal(iso(r.get(2)!.end), "2026-08-13");
+});
+
+test("SS+3d: el sucesor empieza 3 días laborables después del inicio del pred", () => {
+  const tasks = [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+    task({ id: 2, durationDays: 5, dependencies: "1SS+3d" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(2)!.start), "2026-08-06");
+  assert.equal(iso(r.get(2)!.end), "2026-08-12");
+});
+
+test("FF-2d: el sucesor termina 2 días laborables antes que el pred", () => {
+  const tasks = [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+    task({ id: 2, durationDays: 3, dependencies: "1FF-2d" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(2)!.end), "2026-08-05");
+  assert.equal(iso(r.get(2)!.start), "2026-08-03"); // 3 lab que terminan el Mié 05
+});
+
+test("el lag participa en la restricción más tardía", () => {
+  // El predecesor que termina PRIMERO manda, porque su lag lo empuja más lejos.
+  const tasks = [
+    task({ id: 1, start: D("2026-08-03"), end: D("2026-08-05"), durationDays: 3 }),
+    task({ id: 2, start: D("2026-08-03"), end: D("2026-08-11"), durationDays: 7 }),
+    task({ id: 3, durationDays: 5, dependencies: "1FS+10d, 2FS" }),
+  ];
+  const r = computeSchedule(tasks);
+  assert.equal(iso(r.get(3)!.start), "2026-08-20"); // 10 lab tras el FS del 1, no el 12
 });
 
 test("cadena FS (1→2→3) propaga las fechas", () => {

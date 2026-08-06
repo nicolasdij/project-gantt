@@ -9,7 +9,7 @@ The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the ful
 - **Editable grid** with hierarchy (WBS 1, 1.1, 1.2.1), inline editing and autosave. The **ID** column stays frozen when scrolling horizontally, and the **Title** column is resized by dragging the right edge of its header.
 - **Panel widths**: a draggable divider between grid and Gantt. On load the left panel reaches exactly **up to Duration** — Dependencies, % Complete and Owner stay out of view so the Gantt gets the space; scroll the panel horizontally (or move the divider) to reach them.
 - **Date recalculation** Start ↔ End ↔ Duration in working days (Mon–Fri; no holidays). Duration accepts `5d`, `2w` and `1m` (`1w` = 5 days; `1m` = the working days per month set in Settings).
-- **Auto-scheduling from dependencies** (MS Project style): FS, SS and FF. When a dependency is set or edited, the successor is rescheduled preserving its Duration.
+- **Auto-scheduling from dependencies** (MS Project style): FS, SS and FF, with an optional **lag** in working days — `3FS+1d` starts one day after ID 3 finishes, `3FS-1d` overlaps by one. When a dependency is set or edited, the successor is rescheduled preserving its Duration.
 - **No circular dependencies**: a row cannot depend on itself, on an ancestor, or on anything that already depends on it (directly or through other rows). The server answers `409`, an indent that would close a cycle is rejected too, and the cell goes back to its previous value.
 - **Parent roll-up**: Start/End/Duration **and % Complete** of summary rows are computed from their children (the percentage as an average weighted by each child's Duration). Summary rows accept neither dates nor dependencies (both are derived).
 - **% Complete**: a per-row progress column (`0`–`100`, typed as `40` or `40%`) that **fills the Gantt bar** from the left in proportion to it — in a darker shade of the bar's colour and leaving 2px of clearance from the border, so the whole bar still reads behind the fill.
@@ -149,7 +149,7 @@ Back-end unit tests (date utilities, dependency parsing, the scheduling engine �
 docker compose exec server npm test
 ```
 
-54 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
+65 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
 
 ---
 

@@ -55,6 +55,15 @@ export function subWorkingDays(end: Date, workingDays: number): Date {
 }
 
 /**
+ * Corre `date` en `days` días laborables: positivo hacia adelante, negativo hacia atrás,
+ * 0 devuelve la misma fecha. Es lo que necesita el LAG de las dependencias, donde el
+ * signo lo pone el usuario (`3FS+2d` / `3FS-2d`) y no se sabe de antemano.
+ */
+export function shiftWorkingDays(date: Date, days: number): Date {
+  return days >= 0 ? addWorkingDays(date, days) : subWorkingDays(date, -days);
+}
+
+/**
  * Cuenta los días laborables entre `start` y `end`, AMBOS inclusive.
  * Lun→Vie devuelve 5. Si end < start devuelve 0.
  * Un único día laborable (start == end en día hábil) devuelve 1.

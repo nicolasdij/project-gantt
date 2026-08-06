@@ -245,7 +245,8 @@ export function TaskModal() {
               ) : (
                 <input
                   className="cell-input"
-                  placeholder="e.g. 3FS"
+                  placeholder="e.g. 3FS+1d"
+                  title="ID + type (FS, SS, FF) + optional lag in working days: 3FS starts right after ID 3 finishes, 3FS+1d leaves one day in between, 3FS-1d overlaps by one."
                   value={draft.dependencies}
                   {...selectAll}
                   onChange={(e) => setField("dependencies", e.target.value)}

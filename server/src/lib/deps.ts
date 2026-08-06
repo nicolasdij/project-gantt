@@ -1,12 +1,27 @@
 // Parseo del campo `dependencies` (texto libre) a estructura.
-// Formato por token: "<ID><TIPO>" — ej. "3FS", "5SS", "12FF".
-// El tipo por defecto (si se omite) es FS. Varios separados por coma/espacio/;.
+// Formato por token: "<ID><TIPO><±LAG>" — ej. "3FS", "5SS+2d", "12FF-1d".
+// El tipo por defecto (si se omite) es FS y el lag por defecto es 0. Varios tokens
+// separados por coma/espacio/;.
 // Tipos soportados en v1: FS, SS, FF. SF queda FUERA de alcance y se ignora.
+//
+// LAG (retardo) / LEAD (adelanto): el número con signo corre la fecha que impone la
+// dependencia, en DÍAS LABORABLES —la misma unidad que Duration—, y la `d` es opcional
+// ("3FS+1" == "3FS+1d"). "ID#3 empieza 1 día después de que termine ID#2" es "2FS+1d".
+// Un lag negativo solapa las tareas: "2FS-1d" arranca el mismo día en que termina el 2.
+// Los porcentajes de MS Project ("3FS+50%") y sus días corridos ("+1ed") quedan fuera:
+// son otra semántica de calendario y el motor entero cuenta días laborables.
 
 export type DepType = "FS" | "SS" | "FF";
-export type Dependency = { predId: number; type: DepType };
+export type Dependency = { predId: number; type: DepType; lag: number };
 
 const SUPPORTED: DepType[] = ["FS", "SS", "FF"];
+
+/**
+ * Tope del |lag|, en días laborables (~10 años). Un token que lo pase se descarta como
+ * cualquier otro malformado: es un typo, y sin tope el desplazamiento se hace día por
+ * día, así que un número disparatado colgaría al scheduler en vez de dar una fecha mala.
+ */
+export const MAX_LAG_DAYS = 3650;
 
 /** Lo mínimo que hace falta para armar el grafo de programación. */
 export type DepGraphTask = { id: number; parentId: number | null; dependencies: string | null };
@@ -65,6 +80,17 @@ export function makeClosesCycle(tasks: DepGraphTask[]) {
 }
 
 /**
+ * Serializa una dependencia al formato del campo. Es el inverso de parseDependencies y
+ * el ÚNICO lugar que arma el token: el remapeo de IDs de la API pasa por acá, así que
+ * olvidarse del lag lo borraría en cada ida y vuelta al servidor.
+ * El lag 0 no se escribe: "3FS" y no "3FS+0d".
+ */
+export function formatDependency(d: Dependency): string {
+  const lag = d.lag === 0 ? "" : `${d.lag > 0 ? "+" : "-"}${Math.abs(d.lag)}d`;
+  return `${d.predId}${d.type}${lag}`;
+}
+
+/**
  * Reescribe los números de un string de dependencias usando `map`.
  * Se usa para traducir entre la clave interna estable y el ID visible (order+1):
  *   - al LEER: map = idInterno → IDvisible
@@ -79,23 +105,33 @@ export function remapDependencies(
   const out = parseDependencies(raw)
     .map((d) => {
       const n = map.get(d.predId);
-      return n != null ? `${n}${d.type}` : null;
+      return n != null ? formatDependency({ ...d, predId: n }) : null;
     })
     .filter((x): x is string => x !== null);
   return out.join(", ");
 }
 
+// "<ID>" "<TIPO>"? ("+"|"-" "<LAG>" "d"?)? — sin espacios internos: los tokens se separan
+// por espacio, así que cada uno llega ya pegado (ver parseDependencies).
+const TOKEN_RE = /^(\d+)([a-zA-Z]{2})?(?:([+-])(\d+)[dD]?)?$/;
+
 export function parseDependencies(raw: string | null | undefined): Dependency[] {
   if (!raw) return [];
-  const tokens = raw.split(/[,;\s]+/).map((t) => t.trim()).filter(Boolean);
+  // El signo del lag se pega a su número ANTES de tokenizar. Un "3FS + 1d" tipeado con
+  // espacios se partiría en tres pedazos y dejaría un "3FS" válido: el peor resultado
+  // posible, porque programa igual pero ignorando en silencio el lag que se pidió.
+  const glued = raw.replace(/\s*([+-])\s*/g, "$1");
+  const tokens = glued.split(/[,;\s]+/).map((t) => t.trim()).filter(Boolean);
   const deps: Dependency[] = [];
   for (const tok of tokens) {
-    const m = tok.match(/^(\d+)\s*([a-zA-Z]{2})?$/);
+    const m = tok.match(TOKEN_RE);
     if (!m) continue;
     const predId = Number(m[1]);
     const type = (m[2]?.toUpperCase() ?? "FS") as DepType;
     if (!SUPPORTED.includes(type)) continue; // ignora SF u otros no soportados
-    deps.push({ predId, type });
+    const lag = m[4] ? Number(m[4]) * (m[3] === "-" ? -1 : 1) : 0;
+    if (Math.abs(lag) > MAX_LAG_DAYS) continue; // fuera de rango: token descartado
+    deps.push({ predId, type, lag });
   }
   return deps;
 }

@@ -5,6 +5,7 @@
 //     FS (Finish-Start): sucesor empieza el día laborable siguiente al fin del pred.
 //     SS (Start-Start):  sucesor empieza a la vez que el pred.
 //     FF (Finish-Finish):sucesor termina a la vez que el pred (Start = End - dur + 1).
+//   El LAG del token ("2FS+1d") corre esa fecha en días laborables, con signo.
 //   Con varias dependencias se toma la restricción más tardía (Start implícito máximo).
 // - Roll-up: los padres toman Start = mín(hijos), End = máx(hijos).
 //
@@ -13,7 +14,7 @@
 // cierran un CICLO se ignoran (ver makeClosesCycle): son las que impedían converger, y
 // el resultado terminaba dependiendo del tope de iteraciones.
 
-import { addWorkingDays, subWorkingDays, workingDaysBetween } from "./dates.ts";
+import { addWorkingDays, shiftWorkingDays, subWorkingDays, workingDaysBetween } from "./dates.ts";
 import { makeClosesCycle, parseDependencies } from "./deps.ts";
 import { groupChildren, makeIsAncestor } from "./tree.ts";
 
@@ -101,10 +102,16 @@ export function computeSchedule(tasks: ScheduleTask[]): Map<number, ScheduledFie
         if (closesCycle(t.id, d.predId)) continue;
         const p = eff.get(d.predId);
         if (!p || !p.start || !p.end) continue; // predecesor inexistente o sin fechas
+        // El LAG corre la fecha que impone la dependencia, en días laborables y con
+        // signo: positivo la retrasa (hueco entre las tareas), negativo la adelanta
+        // (solape). Va sobre la fecha del PREDECESOR, antes de derivar el Start, así
+        // que un FS-1d hace arrancar al sucesor el mismo día en que termina el pred.
         let s: Date;
-        if (d.type === "SS") s = p.start;
-        else if (d.type === "FF") s = dur <= 0 ? p.end : subWorkingDays(p.end, dur - 1);
-        else s = addWorkingDays(p.end, 1); // FS
+        if (d.type === "SS") s = shiftWorkingDays(p.start, d.lag);
+        else if (d.type === "FF") {
+          const target = shiftWorkingDays(p.end, d.lag);
+          s = dur <= 0 ? target : subWorkingDays(target, dur - 1);
+        } else s = shiftWorkingDays(p.end, 1 + d.lag); // FS
         if (!impliedStart || s > impliedStart) impliedStart = s;
       }
       if (!impliedStart) continue;

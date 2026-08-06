@@ -22,6 +22,28 @@ test("cadena simple: todas las tareas son críticas", () => {
   assert.deepEqual(computeCriticalPath(tasks).sort((a, b) => a - b), [1, 2, 3]);
 });
 
+test("un lag NO genera holgura: la cadena sigue entera en el camino crítico", () => {
+  // A →FS+2d→ B. El hueco lo impone la dependencia, no es holgura de A: si el backward
+  // pass no descuenta el lag, A aparece con 2 días de margen y el camino se corta ahí.
+  const tasks = [
+    t({ id: 1, start: D("2026-08-03"), end: D("2026-08-07"), durationDays: 5 }),
+    t({ id: 2, start: D("2026-08-12"), end: D("2026-08-18"), durationDays: 5, dependencies: "1FS+2d" }),
+  ];
+  assert.deepEqual(computeCriticalPath(tasks).sort((a, b) => a - b), [1, 2]);
+});
+
+test("el lag puede volver crítica a la rama más CORTA", () => {
+  // A→B(3d)→D y A→C(2d, FS+5d)→D. B dura más, pero el lag de C empuja más lejos: la
+  // rama crítica es la de C, y la holgura queda en B.
+  const tasks = [
+    t({ id: 1, start: D("2026-08-03"), end: D("2026-08-04"), durationDays: 2 }),
+    t({ id: 2, start: D("2026-08-05"), end: D("2026-08-07"), durationDays: 3, dependencies: "1FS" }),
+    t({ id: 3, start: D("2026-08-12"), end: D("2026-08-13"), durationDays: 2, dependencies: "1FS+5d" }),
+    t({ id: 4, start: D("2026-08-14"), end: D("2026-08-17"), durationDays: 2, dependencies: "2FS, 3FS" }),
+  ];
+  assert.deepEqual(computeCriticalPath(tasks).sort((a, b) => a - b), [1, 3, 4]);
+});
+
 test("rama paralela con holgura NO es crítica", () => {
   // A→B(5d)→D  y  A→C(2d)→D. La rama B es la larga (crítica); C tiene holgura.
   const tasks = [
