@@ -14,6 +14,7 @@ The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the ful
 - **Parent roll-up**: Start/End/Duration **and % Complete** of summary rows are computed from their children (the percentage as an average weighted by each child's Duration). Summary rows accept neither dates nor dependencies (both are derived).
 - **% Complete**: a per-row progress column (`0`–`100`, typed as `40` or `40%`) that **fills the Gantt bar** from the left in proportion to it — in a darker shade of the bar's colour and leaving 2px of clearance from the border, so the whole bar still reads behind the fill.
 - **Critical path**: CPM toggle in the toolbar that paints the zero-slack bars red. A dependency on a summary row is translated to the leaves that actually drive its date.
+- **Bar colour per row**: a 5-swatch palette in the detail modal (the default blue plus green, amber, violet and pink). It colours the row's bar — summary bars and milestone diamonds included — and its progress fill; the critical path view still overrides it with red.
 - **Milestones** (Duration 0) drawn as a ◆ diamond.
 - **Gantt chart** with bars aligned to the rows, **Day / Week / Month** scale, a "today" marker, dependency arrows (SVG) and vertical scroll synchronized with the grid.
 - **Draggable bars**: dragging the **body** moves the whole task (Start and End together, preserving the Duration); dragging the **left** edge moves the Start and the **right** edge moves the End (there the Duration is recomputed). The resulting date snaps to the nearest working day.
@@ -95,7 +96,7 @@ project-gantt/
 │  ├─ src/
 │  │  ├─ routes/            task REST endpoints
 │  │  ├─ services/          recompute (WBS, scheduling, roll-up of dates and progress)
-│  │  └─ lib/               working days, dependencies, tree, schedule, progress, critical path
+│  │  └─ lib/               working days, dependencies, tree, schedule, progress, colours, critical path
 │  ├─ prisma/
 │  │  ├─ schema.prisma      schema of the `tasks` table
 │  │  ├─ migrations/        migration history (versioned)
@@ -116,7 +117,7 @@ Base: `http://localhost:3000/api`
 | GET | `/tasks` | Ordered list of tasks (pre-order) |
 | GET | `/tasks/:id` | Detail of a task (404 if it doesn't exist) |
 | POST | `/tasks` | Creates a row. Body: `{ title?, parentId?, afterId? }` (`afterId` inserts below and inherits the parent) |
-| PATCH | `/tasks/:id` | **Autosave** per field (last-write-wins). Editing `start`/`end`/`durationDays`/`dependencies` triggers the recalculation, and `progress` re-rolls it up the ancestors. Returns `409` for: dates, dependencies or `progress` on a parent row (all derived — the dependency belongs on the first child, the progress on the children), and a dependency that is **circular** — on itself, on an ancestor, or on a row that already depends on this one. `progress` outside 0–100 is clamped; a non-numeric one is `400` |
+| PATCH | `/tasks/:id` | **Autosave** per field (last-write-wins). Editing `start`/`end`/`durationDays`/`dependencies` triggers the recalculation, and `progress` re-rolls it up the ancestors. Returns `409` for: dates, dependencies or `progress` on a parent row (all derived — the dependency belongs on the first child, the progress on the children), and a dependency that is **circular** — on itself, on an ancestor, or on a row that already depends on this one. `progress` outside 0–100 is clamped; a non-numeric one is `400`. A `barColor` outside the palette is `400` (empty means the default) |
 | POST | `/tasks/:id/move` | Reorders among siblings. Body: `{ direction: "up" \| "down" }` |
 | POST | `/tasks/:id/indent` | Turns the row into a child of the previous sibling. `409` if the new parent–child edge would close a dependency cycle |
 | POST | `/tasks/:id/outdent` | Moves the row up one level |
@@ -142,13 +143,13 @@ After every mutation, the server recomputes **WBS + order**, applies the **depen
 
 ## Tests
 
-Back-end unit tests (date utilities, dependency parsing, the scheduling engine — including the cycle rules — the progress roll-up and the CPM):
+Back-end unit tests (date utilities, dependency parsing, the scheduling engine — including the cycle rules — the progress roll-up, the colour palette and the CPM):
 
 ```bash
 docker compose exec server npm test
 ```
 
-50 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
+54 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
 
 ---
 

@@ -10,6 +10,7 @@ import { useUI } from "../store.ts";
 import { useTasks, useTaskMutations } from "../queries.ts";
 import { MarkdownEditor } from "./MarkdownEditor.tsx";
 import { EditableDate, useSelectAllOnFocus } from "./cells.tsx";
+import { BAR_COLORS, barColorKey, type BarColorKey } from "../lib/barColors.ts";
 import {
   formatDuration,
   parseDuration,
@@ -26,6 +27,7 @@ type Draft = {
   end: string; // YYYY-MM-DD o ""
   duration: string; // "Nd" / "Nw"
   progress: string; // "40%" (se parsea al guardar)
+  barColor: BarColorKey; // "" = el color por defecto
   owner: string;
   dependencies: string;
   descriptionMd: string;
@@ -37,6 +39,7 @@ const draftOf = (task: Task): Draft => ({
   end: isoToDate(task.end),
   duration: formatDuration(task.durationDays),
   progress: formatPercent(task.progress),
+  barColor: barColorKey(task.barColor),
   owner: task.owner ?? "",
   dependencies: task.dependencies ?? "",
   descriptionMd: task.descriptionMd ?? "",
@@ -115,6 +118,9 @@ export function TaskModal() {
     const data: PatchData = {};
     if (d.title !== base.title) data.title = d.title;
     if (d.owner !== base.owner) data.owner = d.owner;
+    // El color es estilo, no programación: se acepta también en una fila padre (su
+    // barra de resumen se pinta igual). "" es el default, y en la base eso es null.
+    if (d.barColor !== base.barColor) data.barColor = d.barColor || null;
     if (d.descriptionMd !== base.descriptionMd) data.descriptionMd = d.descriptionMd;
 
     // En las filas padre Start/End/Duration son calculados y las Dependencies no
@@ -268,6 +274,31 @@ export function TaskModal() {
                 onChange={(e) => setField("owner", e.target.value)}
               />
             </label>
+          </div>
+
+          {/* OJO: <div> y no <label>, por lo mismo que el editor de Markdown: un
+              <label> se asocia al primer elemento labelable que contiene —acá el
+              primer botón de la paleta— y clickear el texto "Bar colour" elegiría el
+              color por defecto sin que nadie lo pidiera. */}
+          <div className="field">
+            <span>Bar colour</span>
+            <div className="color-picker" role="radiogroup" aria-label="Bar colour">
+              {BAR_COLORS.map((c) => (
+                <button
+                  key={c.key || "default"}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.barColor === c.key}
+                  aria-label={c.label}
+                  title={c.label}
+                  className={`color-swatch ${draft.barColor === c.key ? "selected" : ""}`}
+                  // El tono sale de la variable CSS de la paleta: la muestra y la barra
+                  // que va a pintar leen el MISMO valor.
+                  style={{ background: `var(${c.cssVar})` }}
+                  onClick={() => setField("barColor", c.key)}
+                />
+              ))}
+            </div>
           </div>
 
           {isParent && (

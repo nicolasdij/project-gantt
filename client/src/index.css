@@ -10,6 +10,21 @@
   --muted: #7a828c;
   --accent: #2563eb;
   --milestone: #7c3aed;
+
+  /* Paleta de las barras del Gantt (se elige por fila en el modal; ver
+     lib/barColors.ts). Cada color trae su tono de RELLENO, más oscuro, que es el que
+     usa el % de avance. Los tonos viven acá y en ningún otro lado: la barra, su
+     relleno y la muestra del selector salen todos de estas variables. */
+  --bar-blue: #3b82f6;
+  --bar-blue-fill: #1d4ed8;
+  --bar-green: #16a34a;
+  --bar-green-fill: #14532d;
+  --bar-amber: #d97706;
+  --bar-amber-fill: #92400e;
+  --bar-violet: #7c3aed;
+  --bar-violet-fill: #5b21b6;
+  --bar-pink: #db2777;
+  --bar-pink-fill: #9d174d;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
   color: var(--text);
@@ -156,7 +171,7 @@ body {
 }
 .tl-bar {
   position: absolute;
-  background: #3b82f6;
+  background: var(--bar-blue);
   border-radius: 4px;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
   z-index: 1;
@@ -176,7 +191,7 @@ body {
   top: 2px;
   bottom: 2px;
   left: 2px;
-  background: #1d4ed8;
+  background: var(--bar-blue-fill);
   border-radius: 2px;
   pointer-events: none;
 }
@@ -232,6 +247,40 @@ body {
 }
 .tl-milestone.tl-critical {
   background: #dc2626;
+}
+
+/* --- Color de barra por fila (paleta del modal) ---------------------------------
+   Va DESPUÉS de .tl-bar-parent y de .tl-milestone: empata en especificidad con ellos,
+   así que el color elegido gana por orden y se aplica igual a la barra fina de un
+   resumen y al rombo de un hito (si no, elegir un color en esas filas no haría nada).
+   NO gana contra el camino crítico: `.tl-bar.tl-critical` lleva dos clases y se
+   impone: la vista de CPM es un diagnóstico, no el estilo de la fila. */
+.tl-color-green {
+  background: var(--bar-green);
+}
+.tl-color-amber {
+  background: var(--bar-amber);
+}
+.tl-color-violet {
+  background: var(--bar-violet);
+}
+.tl-color-pink {
+  background: var(--bar-pink);
+}
+/* El relleno de avance acompaña al color de su barra: gana a la regla del padre por
+   orden (empatan en dos clases) y pierde contra las del crítico, que llevan tres y se
+   imponen por especificidad esté donde esté este bloque. */
+.tl-color-green .tl-bar-fill {
+  background: var(--bar-green-fill);
+}
+.tl-color-amber .tl-bar-fill {
+  background: var(--bar-amber-fill);
+}
+.tl-color-violet .tl-bar-fill {
+  background: var(--bar-violet-fill);
+}
+.tl-color-pink .tl-bar-fill {
+  background: var(--bar-pink-fill);
 }
 .tl-arrows {
   position: absolute;
@@ -627,6 +676,36 @@ select.cell-input {
 .field-row {
   display: flex;
   gap: 12px;
+}
+
+/* Paleta de colores de la barra (modal de detalle): una muestra por color, la elegida
+   con un anillo. El anillo va por fuera con box-shadow y no con un borde, para que no
+   le coma tamaño al color ni mueva las muestras de lugar al cambiar la selección.
+   Es NEUTRO (--text) y no del color de acento: en azul —que es justo el default— un
+   anillo azul sobre una muestra azul no se distinguía. */
+.color-picker {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+}
+.color-swatch {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  padding: 0;
+  cursor: pointer;
+}
+.color-swatch:hover {
+  box-shadow: 0 0 0 2px var(--border-strong);
+}
+.color-swatch.selected,
+.color-swatch.selected:hover {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--text);
+}
+.color-swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .hint {
   margin: 0;

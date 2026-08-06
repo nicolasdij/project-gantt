@@ -10,6 +10,8 @@ export type Task = {
   isMilestone: boolean;
   /** Avance 0..100. En las filas padre es calculado (roll-up ponderado por duración). */
   progress: number;
+  /** Clave de la paleta ("green", "amber"…) o null = color por defecto. */
+  barColor: string | null;
   owner: string | null;
   dependencies: string | null;
   descriptionMd: string | null;
@@ -22,6 +24,7 @@ export type EditableField =
   | "end"
   | "durationDays"
   | "progress"
+  | "barColor"
   | "owner"
   | "dependencies"
   | "descriptionMd";

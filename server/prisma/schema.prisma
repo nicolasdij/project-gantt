@@ -42,6 +42,11 @@ model Task {
   // igual que las fechas de roll-up.
   progress      Int      @default(0)
 
+  // Color de la barra en el Gantt. Se guarda la CLAVE de la paleta ("green",
+  // "amber"…), no un color: así cambiar un tono es cambiar el CSS y no migrar datos.
+  // null = el color por defecto (la paleta lo ofrece como una opción más).
+  barColor      String?
+
   // Un solo responsable.
   owner         String?
 

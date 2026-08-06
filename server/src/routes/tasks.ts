@@ -9,6 +9,7 @@ import { computeCriticalPath, type CriticalTask } from "../lib/critical.ts";
 import { makeClosesCycle, parseDependencies, remapDependencies } from "../lib/deps.ts";
 import { makeIsAncestor } from "../lib/tree.ts";
 import { clampPercent } from "../lib/progress.ts";
+import { BAR_COLOR_KEYS, normalizeBarColor } from "../lib/barColors.ts";
 
 // Campos de contenido editables directamente (no disparan recálculo de fechas).
 const CONTENT_FIELDS = ["title", "owner", "descriptionMd"] as const;
@@ -136,6 +137,17 @@ export async function taskRoutes(app: FastifyInstance) {
         error:
           "% Complete of a parent row is rolled up from its children (a duration-weighted average), so it is not editable. Set it on the children instead.",
       });
+    }
+    // Color de la barra: es estilo, no programación. Se acepta en cualquier fila
+    // (también en un padre: su barra de resumen se pinta igual) y no dispara nada.
+    if ("barColor" in body) {
+      const color = normalizeBarColor(body.barColor);
+      if (color === undefined) {
+        return reply.code(400).send({
+          error: `Unknown bar colour. Use one of: ${BAR_COLOR_KEYS.join(", ")} (or empty for the default).`,
+        });
+      }
+      data.barColor = color;
     }
     if (touchesProgress) {
       const n = Number(body.progress);

@@ -9,6 +9,7 @@ import { useCriticalPath, useTaskMutations } from "../queries.ts";
 import { parseDependencies } from "../lib/deps.ts";
 import { buildTimeScale } from "../lib/timeScale.ts";
 import { addDaysIso, addWorkingDaysIso, isoToDate, snapToWorkingDayIso } from "../lib/format.ts";
+import { barColorClass } from "../lib/barColors.ts";
 import { ROW_H, HEAD_H } from "../lib/layout.ts";
 
 type Geom = { startX: number; endX: number; cy: number; isMilestone: boolean };
@@ -295,13 +296,16 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
             if (!t.start || !t.end) return null;
             const isParent = parentIds.has(t.id);
             const critical = isCritical(t.id);
+            // Color elegido en el modal (vacío = el de siempre). En la vista de camino
+            // crítico el rojo gana: es un diagnóstico, no un estilo de la fila.
+            const color = barColorClass(t.barColor);
             if (t.isMilestone) {
               // El centro es el punto medio entre los vértices izq/der guardados en geom.
               const center = (g.startX + g.endX) / 2;
               return (
                 <div
                   key={`bar${t.id}`}
-                  className={`tl-milestone ${critical ? "tl-critical" : ""}`}
+                  className={`tl-milestone ${color} ${critical ? "tl-critical" : ""}`}
                   style={{ left: center - MS_SIZE / 2, top: g.cy - MS_SIZE / 2, width: MS_SIZE, height: MS_SIZE }}
                   title={t.title}
                 />
@@ -321,7 +325,7 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
             return (
               <div
                 key={`bar${t.id}`}
-                className={`tl-bar ${isParent ? "tl-bar-parent" : ""} ${draggable ? "tl-bar-draggable" : ""} ${critical ? "tl-critical" : ""}`}
+                className={`tl-bar ${isParent ? "tl-bar-parent" : ""} ${color} ${draggable ? "tl-bar-draggable" : ""} ${critical ? "tl-critical" : ""}`}
                 style={{ left: g.startX, top: g.cy - barH / 2, width: w, height: barH }}
                 title={draggable ? `${label} — drag to move, drag an edge to resize` : label}
                 onMouseDown={draggable ? (e) => beginDrag(e, t, "move") : undefined}

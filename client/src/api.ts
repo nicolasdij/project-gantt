@@ -27,6 +27,7 @@ export type PatchData = Partial<
     | "end"
     | "durationDays"
     | "progress"
+    | "barColor"
     | "owner"
     | "dependencies"
     | "descriptionMd"
