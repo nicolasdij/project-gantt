@@ -7,6 +7,11 @@ import { recalcDates } from "../lib/recalc.ts";
 import { recomputeProject, isParent } from "../services/project.ts";
 import { computeCriticalPath, type CriticalTask } from "../lib/critical.ts";
 import { makeClosesCycle, parseDependencies, remapDependencies } from "../lib/deps.ts";
+import {
+  findReparentConflict,
+  resolveMove,
+  type ReparentConflict,
+} from "../lib/move.ts";
 import { makeIsAncestor } from "../lib/tree.ts";
 import { clampPercent } from "../lib/progress.ts";
 import { BAR_COLOR_KEYS, normalizeBarColor } from "../lib/barColors.ts";
@@ -33,6 +38,22 @@ function buildMaps(tasks: SeqTask[]) {
 // Devuelve la tarea con sus Dependencies traducidas a ID visible (para el cliente).
 function toSeq<T extends { dependencies: string | null }>(task: T, idToSeq: Map<number, number>): T {
   return { ...task, dependencies: remapDependencies(task.dependencies, idToSeq) };
+}
+
+// Mensaje del 409 cuando reparentar cerraría un ciclo. Lo comparten `indent` y `move`:
+// agregan la misma arista (hijo → padre nuevo), solo cambia el verbo de la frase.
+function reparentError(
+  action: "indent" | "move",
+  conflict: ReparentConflict,
+  tasks: { id: number; title: string }[],
+  idToSeq: Map<number, number>,
+): string {
+  const t = tasks.find((x) => x.id === conflict.taskId);
+  const who = t?.title || `ID ${idToSeq.get(conflict.taskId)}`;
+  const pred = idToSeq.get(conflict.predId);
+  return conflict.kind === "direct"
+    ? `Cannot ${action}: "${who}" depends on ID ${pred}, which would become its parent (or ancestor). Remove that dependency first.`
+    : `Cannot ${action}: it would create a circular chain — "${who}" depends on ID ${pred}. Remove that dependency first.`;
 }
 
 export async function taskRoutes(app: FastifyInstance) {
@@ -243,27 +264,40 @@ export async function taskRoutes(app: FastifyInstance) {
   const siblingsOf = (parentId: number | null) =>
     prisma.task.findMany({ where: { parentId }, orderBy: { order: "asc" } });
 
-  // --- MOVER ARRIBA / ABAJO (reordenar entre hermanos) ---
+  // --- MOVER ARRIBA / ABAJO ---
+  // Entre hermanos, y en los extremos del grupo CRUZA al grupo de al lado conservando el
+  // nivel (ver resolveMove). Cruzar cambia de padre, así que valida ciclos como el indent.
   app.post("/api/tasks/:id/move", async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     const dir = ((req.body as { direction?: string })?.direction ?? "").toLowerCase();
     if (dir !== "up" && dir !== "down") {
       return reply.code(400).send({ error: 'direction must be "up" or "down"' });
     }
-    const task = await prisma.task.findUnique({ where: { id } });
+    const all = await prisma.task.findMany();
+    const task = all.find((t) => t.id === id);
     if (!task) return reply.code(404).send({ error: "Task not found" });
 
-    const sibs = await siblingsOf(task.parentId);
-    const idx = sibs.findIndex((s) => s.id === id);
-    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= sibs.length) {
-      return listForClient(); // extremo: no-op
+    const plan = resolveMove(all, id, dir);
+    if (!plan) return listForClient(); // borde sin grupo al lado: no-op
+
+    if (plan.kind === "swap") {
+      const other = all.find((t) => t.id === plan.otherId)!;
+      await prisma.$transaction([
+        prisma.task.update({ where: { id: task.id }, data: { order: other.order } }),
+        prisma.task.update({ where: { id: other.id }, data: { order: task.order } }),
+      ]);
+    } else {
+      const conflict = findReparentConflict(all, id, plan.newParentId);
+      if (conflict) {
+        return reply
+          .code(409)
+          .send({ error: reparentError("move", conflict, all, buildMaps(all).idToSeq) });
+      }
+      await prisma.task.update({
+        where: { id },
+        data: { parentId: plan.newParentId, order: plan.newOrder },
+      });
     }
-    const other = sibs[swapIdx];
-    await prisma.$transaction([
-      prisma.task.update({ where: { id: task.id }, data: { order: other.order } }),
-      prisma.task.update({ where: { id: other.id }, data: { order: task.order } }),
-    ]);
     await recomputeProject();
     return listForClient();
   });
@@ -282,39 +316,15 @@ export async function taskRoutes(app: FastifyInstance) {
     const newParent = sibs[idx - 1];
 
     // Indentar cambia los ancestros de toda la rama, así que puede volver circular una
-    // dependencia existente sin tocar el campo: si la fila (o alguna descendiente)
-    // depende del nuevo padre o de un ancestro suyo, se rechaza en vez de dejar el
-    // dato en un estado inválido o borrarlo por su cuenta.
+    // dependencia existente sin tocar el campo: se rechaza en vez de dejar el dato en un
+    // estado inválido o borrarlo por su cuenta. Misma validación que el cruce de grupo de
+    // `move`: las dos operaciones agregan la arista de roll-up hijo → padre nuevo.
     const all = await prisma.task.findMany();
-    const isAncestor = makeIsAncestor(all);
-    const { idToSeq } = buildMaps(all);
-    const inMovedBranch = (t: { id: number }) => t.id === id || isAncestor(id, t.id);
-    const becomesAncestor = (predId: number) =>
-      predId === newParent.id || isAncestor(predId, newParent.id);
-    for (const t of all) {
-      if (!inMovedBranch(t)) continue;
-      const circular = parseDependencies(t.dependencies).find((d) => becomesAncestor(d.predId));
-      if (circular) {
-        return reply.code(409).send({
-          error: `Cannot indent: "${t.title || `ID ${idToSeq.get(t.id)}`}" depends on ID ${idToSeq.get(circular.predId)}, which would become its parent (or ancestor). Remove that dependency first.`,
-        });
-      }
-    }
-
-    // El chequeo de arriba ve las dependencias DIRECTAS al nuevo ancestro. La arista de
-    // roll-up que agrega el indent también puede cerrar un ciclo de forma indirecta (X
-    // depende de Y, Y de B, y se indenta B bajo X), así que se revisa el grafo completo
-    // con el movimiento ya aplicado. Antes del indent no hay ciclos —la API los
-    // rechaza—, así que cualquiera que aparezca lo causa este movimiento.
-    const moved = all.map((t) => (t.id === id ? { ...t, parentId: newParent.id } : t));
-    const closesCycleAfter = makeClosesCycle(moved);
-    for (const t of moved) {
-      const cyclic = parseDependencies(t.dependencies).find((d) => closesCycleAfter(t.id, d.predId));
-      if (cyclic) {
-        return reply.code(409).send({
-          error: `Cannot indent: it would create a circular chain — "${t.title || `ID ${idToSeq.get(t.id)}`}" depends on ID ${idToSeq.get(cyclic.predId)}. Remove that dependency first.`,
-        });
-      }
+    const conflict = findReparentConflict(all, id, newParent.id);
+    if (conflict) {
+      return reply
+        .code(409)
+        .send({ error: reparentError("indent", conflict, all, buildMaps(all).idToSeq) });
     }
 
     // Se añade como último hijo del nuevo padre.

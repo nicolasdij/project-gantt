@@ -80,10 +80,12 @@ export function Toolbar() {
         </button>
       </div>
 
+      {/* Los tooltips nombran el cruce de grupo: es el borde donde antes no pasaba nada,
+          y sin decirlo no hay forma de descubrirlo. */}
       <div className="tb-group">
         <button
           className="tb-btn"
-          title="Move up"
+          title="Move up — from the top of a group, moves into the previous group (same level)"
           onClick={() => hasSel && move.mutate({ id: selectedId!, direction: "up" })}
           disabled={!hasSel}
         >
@@ -91,7 +93,7 @@ export function Toolbar() {
         </button>
         <button
           className="tb-btn"
-          title="Move down"
+          title="Move down — from the bottom of a group, moves into the next group (same level)"
           onClick={() => hasSel && move.mutate({ id: selectedId!, direction: "down" })}
           disabled={!hasSel}
         >

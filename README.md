@@ -10,7 +10,7 @@ The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the ful
 - **Panel widths**: a draggable divider between grid and Gantt. On load the left panel reaches exactly **up to Duration** — Dependencies, % Complete and Owner stay out of view so the Gantt gets the space; scroll the panel horizontally (or move the divider) to reach them.
 - **Date recalculation** Start ↔ End ↔ Duration in working days (Mon–Fri; no holidays). Duration accepts `5d`, `2w` and `1m` (`1w` = 5 days; `1m` = the working days per month set in Settings).
 - **Auto-scheduling from dependencies** (MS Project style): FS, SS and FF, with an optional **lag** in working days — `3FS+1d` starts one day after ID 3 finishes, `3FS-1d` overlaps by one. When a dependency is set or edited, the successor is rescheduled preserving its Duration.
-- **No circular dependencies**: a row cannot depend on itself, on an ancestor, or on anything that already depends on it (directly or through other rows). The server answers `409`, an indent that would close a cycle is rejected too, and the cell goes back to its previous value.
+- **No circular dependencies**: a row cannot depend on itself, on an ancestor, or on anything that already depends on it (directly or through other rows). The server answers `409`, a re-parenting that would close a cycle is rejected too (an indent, or a 🔺/🔻 that crosses groups), and the cell goes back to its previous value.
 - **Parent roll-up**: Start/End/Duration **and % Complete** of summary rows are computed from their children (the percentage as an average weighted by each child's Duration). Summary rows accept neither dates nor dependencies (both are derived).
 - **% Complete**: a per-row progress column (`0`–`100`, typed as `40` or `40%`) that **fills the Gantt bar** from the left in proportion to it — in a darker shade of the bar's colour and leaving 2px of clearance from the border, so the whole bar still reads behind the fill.
 - **Critical path**: CPM toggle in the toolbar that paints the zero-slack bars red. A dependency on a summary row is translated to the leaves that actually drive its date.
@@ -20,7 +20,7 @@ The whole application runs in **Docker**. See [`SPEC.md`](./SPEC.md) for the ful
 - **Draggable bars**: dragging the **body** moves the whole task (Start and End together, preserving the Duration); dragging the **left** edge moves the Start and the **right** edge moves the End (there the Duration is recomputed). The resulting date snaps to the nearest working day.
 - **Settings** (⚙️ in the toolbar): a popup to configure app behaviour, with **Save / Cancel**. It holds the **date format** used by Start and End (5 common formats) and the **working days per month** (20/21/22) that `1m` means in the Duration field. Both are stored in the browser.
 - **Detail modal** (from the ID link) with a rich-text description editor stored as Markdown and **Save / Cancel** buttons (the modal is not autosave: cancelling discards).
-- Reorder / indent / outdent / add / delete rows.
+- Reorder / indent / outdent / add / delete rows. 🔺/🔻 also **cross groups**: from the top of a group the row moves into the previous group (from the bottom, into the next one) keeping its level, instead of needing outdent → move up → indent.
 - **Editing that gets out of the way**: focusing a field (with Tab or the mouse) selects all of its text, a new row focuses its Title, and a cell whose change the server rejects reverts instead of showing an unsaved value.
 - **Discarding blank rows:** when the selection moves to another row, the one left behind is deleted if it ended up completely empty (no title, dates, owner, dependencies or description, % Complete at 0, and with the Duration untouched).
 
@@ -96,7 +96,7 @@ project-gantt/
 │  ├─ src/
 │  │  ├─ routes/            task REST endpoints
 │  │  ├─ services/          recompute (WBS, scheduling, roll-up of dates and progress)
-│  │  └─ lib/               working days, dependencies, tree, schedule, progress, colours, critical path
+│  │  └─ lib/               working days, dependencies, tree, moves, schedule, progress, colours, critical path
 │  ├─ prisma/
 │  │  ├─ schema.prisma      schema of the `tasks` table
 │  │  ├─ migrations/        migration history (versioned)
@@ -118,7 +118,7 @@ Base: `http://localhost:3000/api`
 | GET | `/tasks/:id` | Detail of a task (404 if it doesn't exist) |
 | POST | `/tasks` | Creates a row. Body: `{ title?, parentId?, afterId? }` (`afterId` inserts below and inherits the parent) |
 | PATCH | `/tasks/:id` | **Autosave** per field (last-write-wins). Editing `start`/`end`/`durationDays`/`dependencies` triggers the recalculation, and `progress` re-rolls it up the ancestors. Returns `409` for: dates, dependencies or `progress` on a parent row (all derived — the dependency belongs on the first child, the progress on the children), and a dependency that is **circular** — on itself, on an ancestor, or on a row that already depends on this one. `progress` outside 0–100 is clamped; a non-numeric one is `400`. A `barColor` outside the palette is `400` (empty means the default) |
-| POST | `/tasks/:id/move` | Reorders among siblings. Body: `{ direction: "up" \| "down" }` |
+| POST | `/tasks/:id/move` | Reorders among siblings and, at the ends of a group, **crosses into the adjacent group** keeping the level (the branch travels with it). Body: `{ direction: "up" \| "down" }`. No-op when there is no group on that side or that sibling is a leaf (giving it a child would turn it into a summary row). `409` if crossing would close a dependency cycle |
 | POST | `/tasks/:id/indent` | Turns the row into a child of the previous sibling. `409` if the new parent–child edge would close a dependency cycle |
 | POST | `/tasks/:id/outdent` | Moves the row up one level |
 | DELETE | `/tasks/:id` | Deletes the row (children cascade) |
@@ -143,13 +143,13 @@ After every mutation, the server recomputes **WBS + order**, applies the **depen
 
 ## Tests
 
-Back-end unit tests (date utilities, dependency parsing, the scheduling engine — including the cycle rules — the progress roll-up, the colour palette and the CPM):
+Back-end unit tests (date utilities, dependency parsing, the scheduling engine — including the cycle rules — row moves, the progress roll-up, the colour palette and the CPM):
 
 ```bash
 docker compose exec server npm test
 ```
 
-65 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
+77 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
 
 ---
 
