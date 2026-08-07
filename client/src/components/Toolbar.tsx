@@ -3,7 +3,7 @@
 // muestran deshabilitados hasta su fase.
 import { useState } from "react";
 import { useUI } from "../store.ts";
-import { useTasks, useTaskMutations, useSavingCount } from "../queries.ts";
+import { useParentIds, useTasks, useTaskMutations, useSavingCount } from "../queries.ts";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 
 export function Toolbar() {
@@ -22,7 +22,10 @@ export function Toolbar() {
 
   const hasSel = selectedId != null;
   const selectedTask = tasks.find((t) => t.id === selectedId) ?? null;
-  const hasChildren = selectedTask ? tasks.some((t) => t.parentId === selectedTask.id) : false;
+  // OJO: el hook se llama SIEMPRE, no dentro del `&&`. Con la selección en null el
+  // cortocircuito lo saltearía y React vería una lista de hooks distinta según el render.
+  const parentIds = useParentIds();
+  const hasChildren = selectedTask != null && parentIds.has(selectedTask.id);
 
   const addRow = () =>
     create.mutate(

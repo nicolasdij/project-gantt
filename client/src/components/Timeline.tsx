@@ -5,7 +5,7 @@
 import { forwardRef, memo, useEffect, useMemo, useState } from "react";
 import type { Task } from "../types.ts";
 import { useUI } from "../store.ts";
-import { useCriticalPath, useTaskMutations } from "../queries.ts";
+import { useCriticalPath, useParentIds, useTaskMutations } from "../queries.ts";
 import { buildTimeScale } from "../lib/timeScale.ts";
 import { addDaysIso, addWorkingDaysIso, isoToDate, snapToWorkingDayIso } from "../lib/format.ts";
 import { barColorClass } from "../lib/barColors.ts";
@@ -56,10 +56,7 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
   // para que el timeline no se re-encuadre debajo del puntero en medio del gesto.
   const scale = useMemo(() => buildTimeScale(tasks, zoom, today), [tasks, zoom, today]);
 
-  const parentIds = useMemo(
-    () => new Set(tasks.map((t) => t.parentId).filter((x): x is number => x != null)),
-    [tasks],
-  );
+  const parentIds = useParentIds();
 
   // --- Redimensionar barras arrastrando los bordes ---
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -342,6 +339,7 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
             const pct = Math.max(0, Math.min(100, t.progress));
             const fillW = (Math.max(0, w - FILL_INSET * 2) * pct) / 100;
             const label = pct > 0 ? `${t.title} — ${pct}% complete` : t.title;
+            const barTitle = barTitles.get(t.id);
             return (
               <div
                 key={`bar${t.id}`}
@@ -355,9 +353,7 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
                 {fillW >= 1 && <span className="tl-bar-fill" style={{ width: fillW }} />}
                 {/* Rótulo que SÍ entra: centrado adentro, después del relleno para que
                     se dibuje encima de él. El que no entra va en su propia capa. */}
-                {barTitles.get(t.id)?.inside && (
-                  <span className="tl-bar-title">{barTitles.get(t.id)!.text}</span>
-                )}
+                {barTitle?.inside && <span className="tl-bar-title">{barTitle.text}</span>}
                 {draggable && (
                   <>
                     <span

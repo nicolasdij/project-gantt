@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import type { Task } from "../types.ts";
 import { useUI } from "../store.ts";
-import { useTaskMutations } from "../queries.ts";
+import { useParentIds, useTaskMutations } from "../queries.ts";
 import { EditableText, EditableDate } from "./cells.tsx";
 import {
   formatDuration,
@@ -35,10 +35,7 @@ export function Grid({ tasks, titleWidth, onTitleResizeStart, titleResizing }: G
   const { patch } = useTaskMutations();
 
   // Ids que son padres (tienen al menos un hijo): sus fechas son calculadas.
-  const parentIds = useMemo(
-    () => new Set(tasks.map((t) => t.parentId).filter((x): x is number => x != null)),
-    [tasks],
-  );
+  const parentIds = useParentIds();
 
   // Valores de Owner ya existentes para el autocomplete.
   const owners = useMemo(

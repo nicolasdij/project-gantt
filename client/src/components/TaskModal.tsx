@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Task } from "../types.ts";
 import type { PatchData } from "../api.ts";
 import { useUI } from "../store.ts";
-import { useTasks, useTaskMutations } from "../queries.ts";
+import { useParentIds, useTasks, useTaskMutations } from "../queries.ts";
 import { MarkdownEditor } from "./MarkdownEditor.tsx";
 import { EditableDate, useSelectAllOnFocus } from "./cells.tsx";
 import { BAR_COLORS, barColorKey, type BarColorKey } from "../lib/barColors.ts";
@@ -60,10 +60,8 @@ export function TaskModal() {
     () => tasks.find((t) => t.id === modalTaskId) ?? null,
     [tasks, modalTaskId],
   );
-  const isParent = useMemo(
-    () => (task ? tasks.some((t) => t.parentId === task.id) : false),
-    [tasks, task],
-  );
+  const parentIds = useParentIds();
+  const isParent = task != null && parentIds.has(task.id);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   // Espejo del borrador en un ref: los handlers (en particular el de Guardar) leen

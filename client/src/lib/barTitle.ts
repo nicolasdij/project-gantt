@@ -19,15 +19,25 @@ export const BAR_TITLE_GAP = 6;
 // `undefined` = todavía no se intentó; `null` = no hay contexto 2d disponible.
 let ctx: CanvasRenderingContext2D | null | undefined;
 
+// Ancho ya medido por texto. La fuente es fija, así que el ancho de un texto no cambia
+// nunca: sin este cache, arrastrar una barra volvía a medir TODOS los rótulos en cada
+// mousemove (la geometría cambia, el texto no).
+const widths = new Map<string, number>();
+
 function textWidth(text: string): number {
+  const hit = widths.get(text);
+  if (hit !== undefined) return hit;
   if (ctx === undefined) {
     ctx = document.createElement("canvas").getContext("2d");
     if (ctx) ctx.font = LABEL_FONT;
   }
   // Sin contexto 2d no se puede medir. Se asume que NO entra: afuera el texto se lee
-  // completo siempre, así que es el lado seguro para equivocarse.
+  // completo siempre, así que es el lado seguro para equivocarse. No se cachea, para que
+  // vuelva a intentarlo si el contexto llega a estar disponible más tarde.
   if (!ctx) return Number.POSITIVE_INFINITY;
-  return ctx.measureText(text).width;
+  const w = ctx.measureText(text).width;
+  widths.set(text, w);
+  return w;
 }
 
 /** ¿El rótulo entra adentro de una barra de `barWidth` px? */
