@@ -50,15 +50,20 @@ export function makeIsParent(tasks: { id: number; parentId: number | null }[]) {
   return (id: number): boolean => withChildren.has(id);
 }
 
+/**
+ * Agrega `value` a la lista de `key`, creándola si no existía. Es el idiom de
+ * "map de listas", que aparece en cada índice que arma un grafo o un árbol.
+ */
+export function pushInto<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  const list = map.get(key);
+  if (list) list.push(value);
+  else map.set(key, [value]);
+}
+
 /** Agrupa hijos por padre y ordena cada grupo por `order`. */
 export function groupChildren<T extends TreeTask>(tasks: T[]): Map<number | null, T[]> {
   const byParent = new Map<number | null, T[]>();
-  for (const t of tasks) {
-    const key = t.parentId ?? null;
-    const list = byParent.get(key) ?? [];
-    list.push(t);
-    byParent.set(key, list);
-  }
+  for (const t of tasks) pushInto(byParent, t.parentId ?? null, t);
   for (const list of byParent.values()) list.sort((a, b) => a.order - b.order);
   return byParent;
 }
