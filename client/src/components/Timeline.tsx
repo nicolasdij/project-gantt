@@ -1,31 +1,18 @@
 // Panel derecho: timeline del Gantt. Barras alineadas con las filas del grid,
 // escala Day/Week/Month, marcador "hoy", milestones como rombo y flechas de
 // dependencia (SVG). El scroll vertical se sincroniza con el grid (ver App).
-// Las barras se redimensionan arrastrando sus bordes laterales (ver `drag`).
-import { forwardRef, memo, useEffect, useMemo, useState } from "react";
+// Las barras se mueven y se redimensionan arrastrando (el gesto vive en useBarDrag).
+import { forwardRef, memo, useMemo } from "react";
 import type { Task } from "../types.ts";
 import { useUI } from "../store.ts";
 import { useCriticalPath, useParentIds, useTaskMutations } from "../queries.ts";
 import { buildTimeScale } from "../lib/timeScale.ts";
-import { addDaysIso, addWorkingDaysIso, isoToDate, snapToWorkingDayIso } from "../lib/format.ts";
 import { barColorClass } from "../lib/barColors.ts";
 import { BAR_TITLE_GAP, fitsInBar } from "../lib/barTitle.ts";
 import { ROW_H, HEAD_H } from "../lib/layout.ts";
+import { useBarDrag } from "./useBarDrag.ts";
 
 type Geom = { startX: number; endX: number; cy: number; isMilestone: boolean };
-
-// Arrastre de la barra: un borde (redimensiona) o el cuerpo ("move": desplaza
-// Start y End juntos). Se guardan las fechas originales (no las coordenadas) para
-// que el resultado no dependa del scroll ni del zoom durante el gesto.
-type DragMode = "start" | "end" | "move";
-type Drag = {
-  id: number;
-  mode: DragMode;
-  originClientX: number;
-  startIso: string;
-  endIso: string;
-  durationDays: number; // se conserva al mover la barra completa
-};
 
 // Rombo del milestone: cuadro de lado MS_SIZE rotado 45°. La distancia del centro
 // a cada vértice (izq/der) es la semidiagonal = MS_SIZE * √2 / 2.
@@ -58,12 +45,13 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
 
   const parentIds = useParentIds();
 
-  // --- Redimensionar barras arrastrando los bordes ---
-  const [drag, setDrag] = useState<Drag | null>(null);
-  // Fechas provisorias mientras se arrastra (la barra sigue al puntero sin ir al server).
-  const [preview, setPreview] = useState<{ id: number; start: string; end: string } | null>(null);
+  // Arrastre de las barras (estado del gesto, listeners y cursor: ver useBarDrag).
+  const { preview, begin: beginDrag } = useBarDrag(scale.dayWidth, (id, data) =>
+    patch.mutate({ id, data }),
+  );
 
-  // Filas a dibujar: las del server, con el preview aplicado a la que se arrastra.
+  // Filas a dibujar: las del server, con el preview del arrastre aplicado a la que se
+  // mueve, así la barra sigue al puntero sin esperar al server.
   const rows = useMemo(
     () =>
       preview
@@ -71,72 +59,6 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
         : tasks,
     [tasks, preview],
   );
-
-  const beginDrag = (e: React.MouseEvent, t: Task, mode: DragMode) => {
-    if (!t.start || !t.end) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setDrag({
-      id: t.id,
-      mode,
-      originClientX: e.clientX,
-      startIso: isoToDate(t.start),
-      endIso: isoToDate(t.end),
-      durationDays: t.durationDays,
-    });
-  };
-
-  useEffect(() => {
-    if (!drag) return;
-    // Días arrastrados → fechas nuevas. La fecha resultante queda siempre en día
-    // laborable. Al redimensionar, el borde frena contra el opuesto (la barra nunca
-    // se invierte: mínimo 1 día); al mover, se conserva la Duration.
-    const datesAt = (clientX: number) => {
-      const deltaDays = Math.round((clientX - drag.originClientX) / scale.dayWidth);
-      if (drag.mode === "move") {
-        const start = snapToWorkingDayIso(addDaysIso(drag.startIso, deltaDays));
-        // Mismo cálculo que hará el server al conservar la Duration, para que el
-        // preview no muestre un fin distinto del que va a quedar guardado.
-        const end = drag.durationDays <= 0 ? start : addWorkingDaysIso(start, drag.durationDays - 1);
-        return { start, end };
-      }
-      if (drag.mode === "start") {
-        const moved = snapToWorkingDayIso(addDaysIso(drag.startIso, deltaDays));
-        return { start: moved > drag.endIso ? drag.endIso : moved, end: drag.endIso };
-      }
-      const moved = snapToWorkingDayIso(addDaysIso(drag.endIso, deltaDays));
-      return { start: drag.startIso, end: moved < drag.startIso ? drag.startIso : moved };
-    };
-
-    const onMove = (ev: MouseEvent) => setPreview({ id: drag.id, ...datesAt(ev.clientX) });
-    const onUp = (ev: MouseEvent) => {
-      const { start, end } = datesAt(ev.clientX);
-      setDrag(null);
-      setPreview(null);
-      if (start === drag.startIso && end === drag.endIso) return; // no se movió
-      // Mover: se manda SOLO start, porque editar el start es justamente el caso en
-      // que el motor conserva la Duration y recalcula el fin.
-      // Borde izquierdo: start Y end, para que derive la Duration (con solo `start`
-      // movería el fin). Borde derecho: solo end.
-      const data =
-        drag.mode === "move" ? { start } : drag.mode === "start" ? { start, end } : { end };
-      patch.mutate({ id: drag.id, data });
-    };
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag, scale.dayWidth]);
-
-  // Cursor/selección global mientras se arrastra (igual que el splitter del layout).
-  useEffect(() => {
-    document.body.style.userSelect = drag ? "none" : "";
-    document.body.style.cursor = drag ? (drag.mode === "move" ? "grabbing" : "ew-resize") : "";
-  }, [drag]);
 
   // Geometría por tarea (índice de fila = posición en el array, ya ordenado).
   const geom = useMemo(() => {
