@@ -36,15 +36,34 @@ export function makeIsAncestor(tasks: { id: number; parentId: number | null }[])
   };
 }
 
+/**
+ * Devuelve `esPadre(id)`: si la fila tiene al menos un hijo. Es la pregunta que decide
+ * qué campos son DERIVADOS (fechas, % Complete) y cuáles no se dibujan (rótulo de la
+ * barra), así que conviene que tenga una sola definición.
+ * (`computeSchedule` no la usa: ya construye el mapa de hijos para el roll-up y le sale
+ * gratis de ahí.)
+ */
+export function makeIsParent(tasks: { id: number; parentId: number | null }[]) {
+  const withChildren = new Set(
+    tasks.map((t) => t.parentId).filter((x): x is number => x != null),
+  );
+  return (id: number): boolean => withChildren.has(id);
+}
+
+/**
+ * Agrega `value` a la lista de `key`, creándola si no existía. Es el idiom de
+ * "map de listas", que aparece en cada índice que arma un grafo o un árbol.
+ */
+export function pushInto<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  const list = map.get(key);
+  if (list) list.push(value);
+  else map.set(key, [value]);
+}
+
 /** Agrupa hijos por padre y ordena cada grupo por `order`. */
 export function groupChildren<T extends TreeTask>(tasks: T[]): Map<number | null, T[]> {
   const byParent = new Map<number | null, T[]>();
-  for (const t of tasks) {
-    const key = t.parentId ?? null;
-    const list = byParent.get(key) ?? [];
-    list.push(t);
-    byParent.set(key, list);
-  }
+  for (const t of tasks) pushInto(byParent, t.parentId ?? null, t);
   for (const list of byParent.values()) list.sort((a, b) => a.order - b.order);
   return byParent;
 }

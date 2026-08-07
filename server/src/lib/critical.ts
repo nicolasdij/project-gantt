@@ -17,11 +17,14 @@
 
 import { addWorkingDays, shiftWorkingDays, subWorkingDays } from "./dates.ts";
 import { makeClosesCycle, parseDependencies, type DepType } from "./deps.ts";
-import { makeIsAncestor } from "./tree.ts";
+import { groupChildren, makeIsAncestor, makeIsParent, pushInto } from "./tree.ts";
 
 export type CriticalTask = {
   id: number;
   parentId: number | null;
+  // `order` no lo usa el CPM, pero es lo que pide `groupChildren` para ordenar cada
+  // grupo de hermanos; la ruta pasa la fila completa, así que ya viene.
+  order: number;
   start: Date | null;
   end: Date | null;
   durationDays: number;
@@ -34,8 +37,8 @@ export type CriticalTask = {
 type Edge = { other: number; type: "FS" | "SS" | "FF"; lag: number };
 
 export function computeCriticalPath(tasks: CriticalTask[]): number[] {
-  const parentIds = new Set(tasks.map((t) => t.parentId).filter((x): x is number => x != null));
-  const isLeaf = (id: number) => !parentIds.has(id);
+  const isParent = makeIsParent(tasks);
+  const isLeaf = (id: number) => !isParent(id);
 
   // Actividades = hojas con fechas.
   const acts = tasks.filter((t) => isLeaf(t.id) && t.start && t.end);
@@ -43,11 +46,7 @@ export function computeCriticalPath(tasks: CriticalTask[]): number[] {
   const byId = new Map(acts.map((t) => [t.id, t]));
 
   // Hijos por padre, para poder bajar de un padre a sus hojas.
-  const childrenOf = new Map<number, CriticalTask[]>();
-  for (const t of tasks) {
-    if (t.parentId == null) continue;
-    (childrenOf.get(t.parentId) ?? childrenOf.set(t.parentId, []).get(t.parentId)!).push(t);
-  }
+  const childrenOf = groupChildren(tasks);
 
   /** Actividades hoja descendientes de `id` (a cualquier profundidad). */
   const leafActivitiesUnder = (id: number): CriticalTask[] => {
@@ -103,8 +102,8 @@ export function computeCriticalPath(tasks: CriticalTask[]): number[] {
         // El lag viaja en la arista y se aplica DESPUÉS de resolver el predecesor: la
         // traducción padre → hojas no lo toca (es la misma dependencia, un nodo más
         // abajo), así que un "PadreFS+2d" mantiene sus 2 días en cada hoja resuelta.
-        (predsOf.get(s.id) ?? predsOf.set(s.id, []).get(s.id)!).push({ other: predId, type: d.type, lag: d.lag });
-        (succsOf.get(predId) ?? succsOf.set(predId, []).get(predId)!).push({ other: s.id, type: d.type, lag: d.lag });
+        pushInto(predsOf, s.id, { other: predId, type: d.type, lag: d.lag });
+        pushInto(succsOf, predId, { other: s.id, type: d.type, lag: d.lag });
       }
     }
   }

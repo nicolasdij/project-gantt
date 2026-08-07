@@ -87,8 +87,8 @@ docker compose exec server npm test   # server unit tests
 project-gantt/
 ├─ client/                  Front-end (React + Vite + TS)
 │  ├─ src/
-│  │  ├─ components/        Grid, Timeline, Toolbar, modals…
-│  │  ├─ lib/               time scale, layout, parsers, formatting
+│  │  ├─ components/        Grid, Timeline, Toolbar, modals, their hooks…
+│  │  ├─ lib/               time scale, layout, bar labels, formatting
 │  │  ├─ api.ts             HTTP client
 │  │  ├─ queries.ts         data hooks (TanStack Query) + autosave
 │  │  └─ store.ts           UI state (Zustand)
@@ -97,7 +97,8 @@ project-gantt/
 │  ├─ src/
 │  │  ├─ routes/            task REST endpoints
 │  │  ├─ services/          recompute (WBS, scheduling, roll-up of dates and progress)
-│  │  └─ lib/               working days, dependencies, tree, moves, schedule, progress, colours, critical path
+│  │  └─ lib/               working days, dependencies, tree, moves, PATCH validation,
+│  │                        visible-ID translation, schedule, progress, colours, critical path
 │  ├─ prisma/
 │  │  ├─ schema.prisma      schema of the `tasks` table
 │  │  ├─ migrations/        migration history (versioned)
@@ -115,7 +116,7 @@ Base: `http://localhost:3000/api`
 | Method | Path | Description |
 |---|---|---|
 | GET | `/health` | Server status + DB connection |
-| GET | `/tasks` | Ordered list of tasks (pre-order) |
+| GET | `/tasks` | Ordered list of tasks (pre-order). Each row carries `dependencies` (the text, in visible IDs) **and** `deps` (those same dependencies already parsed by the server, so the client never re-parses them) |
 | GET | `/tasks/:id` | Detail of a task (404 if it doesn't exist) |
 | POST | `/tasks` | Creates a row. Body: `{ title?, parentId?, afterId? }` (`afterId` inserts below and inherits the parent) |
 | PATCH | `/tasks/:id` | **Autosave** per field (last-write-wins). Editing `start`/`end`/`durationDays`/`dependencies` triggers the recalculation, and `progress` re-rolls it up the ancestors. Returns `409` for: dates, dependencies, `progress` or `barTitle` on a parent row (the first three are derived — the dependency belongs on the first child, the progress on the children; the bar title is simply not drawn on a summary bar, and an already stored one is kept), and a dependency that is **circular** — on itself, on an ancestor, or on a row that already depends on this one. `progress` outside 0–100 is clamped; a non-numeric one is `400`. A `barColor` outside the palette is `400` (empty means the default) |
@@ -144,13 +145,13 @@ After every mutation, the server recomputes **WBS + order**, applies the **depen
 
 ## Tests
 
-Back-end unit tests (date utilities, dependency parsing, the scheduling engine — including the cycle rules — row moves, the progress roll-up, the colour palette and the CPM):
+Back-end unit tests (date utilities, dependency parsing, the scheduling engine — including the cycle rules — row moves, the `PATCH` validation rules, the progress roll-up, the colour palette and the CPM):
 
 ```bash
 docker compose exec server npm test
 ```
 
-77 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
+93 tests, no external service needed: they exercise the pure engines in `server/src/lib`, so they don't touch the database. The UI is verified by hand.
 
 ---
 

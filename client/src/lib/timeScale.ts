@@ -30,6 +30,10 @@ const parse = (iso: string | null): Date | null => {
   return isNaN(d.getTime()) ? null : midnight(d);
 };
 const addDays = (d: Date, n: number) => new Date(d.getTime() + n * DAY_MS);
+// Lunes y domingo de la semana de `d`. getUTCDay() da 0 para domingo, así que el
+// desplazamiento hasta el lunes es (día + 6) % 7.
+const startOfWeek = (d: Date) => addDays(d, -((d.getUTCDay() + 6) % 7));
+const endOfWeek = (d: Date) => addDays(startOfWeek(d), 6);
 const diffDays = (a: Date, b: Date) => Math.round((midnight(a).getTime() - midnight(b).getTime()) / DAY_MS);
 
 export function buildTimeScale(tasks: Task[], zoom: Zoom, today: Date): TimeScale {
@@ -46,9 +50,18 @@ export function buildTimeScale(tasks: Task[], zoom: Zoom, today: Date): TimeScal
 
   let min = dates.reduce((a, b) => (b < a ? b : a), dates[0] ?? midnight(today));
   let max = dates.reduce((a, b) => (b > a ? b : a), dates[0] ?? midnight(today));
-  // Margen y redondeo al lunes anterior / para encuadrar mejor.
+  // Margen a cada lado, para que la primera y la última barra no queden pegadas al borde.
   min = addDays(min, -3);
   max = addDays(max, 5);
+  // Y el dominio se completa hasta SEMANAS ENTERAS: del lunes anterior al domingo
+  // siguiente. La vista week cuenta sus columnas de 7 en 7 desde el origen, así que sin
+  // esto las etiquetas caían en el día de la semana que tocara —con el margen de 3 días,
+  // un viernes—, el sombreado del fin de semana quedaba en el MEDIO de cada columna en
+  // vez de cerrarla, y la última salía recortada. Alinear el dominio no mueve nada
+  // relativo: barras, flechas y marcador de hoy se posicionan todos con `xOf`, que es
+  // relativo a este mismo origen.
+  min = startOfWeek(min);
+  max = endOfWeek(max);
 
   const dayWidth = DAY_WIDTH[zoom];
   const totalDays = Math.max(1, diffDays(max, min) + 1);

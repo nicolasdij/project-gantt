@@ -1,6 +1,6 @@
 // Hooks de datos (React Query): fetch de tareas + mutaciones.
 // Toda mutación invalida ['tasks'] para releer el estado recalculado del server.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient, useIsMutating } from "@tanstack/react-query";
 import { api, type PatchData } from "./api.ts";
 import type { Task } from "./types.ts";
@@ -26,6 +26,20 @@ export function useCriticalPath(enabled: boolean) {
 /** Indicador global de autosave: cuántas mutaciones hay en vuelo. */
 export function useSavingCount() {
   return useIsMutating();
+}
+
+/**
+ * Ids de las filas que son PADRES (tienen al menos un hijo). Es la pregunta que decide
+ * qué celdas son read-only, qué barra es un resumen y qué rótulo no se dibuja, así que
+ * conviene una sola definición y un solo cálculo por fetch: antes cada componente se
+ * armaba el suyo (dos con la misma expresión copiada, dos con `.some()` por fila).
+ */
+export function useParentIds(): Set<number> {
+  const { data: tasks = [] } = useTasks();
+  return useMemo(
+    () => new Set(tasks.map((t) => t.parentId).filter((x): x is number => x != null)),
+    [tasks],
+  );
 }
 
 // Duración con la que nace una fila nueva (la pone el server al crearla). El campo

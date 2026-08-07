@@ -3,49 +3,14 @@
 // A diferencia del grid (autosave por celda), el modal es un FORMULARIO: los
 // cambios se acumulan en un borrador local y solo se envían al pulsar "Guardar".
 // "Cancelar" (y ✕ / Escape / click en el fondo) cierra descartando el borrador.
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { Task } from "../types.ts";
-import type { PatchData } from "../api.ts";
+import { useEffect, useMemo, useState } from "react";
 import { useUI } from "../store.ts";
-import { useTasks, useTaskMutations } from "../queries.ts";
+import { useParentIds, useTasks, useTaskMutations } from "../queries.ts";
 import { MarkdownEditor } from "./MarkdownEditor.tsx";
 import { EditableDate, useSelectAllOnFocus } from "./cells.tsx";
-import { BAR_COLORS, barColorKey, type BarColorKey } from "../lib/barColors.ts";
-import {
-  formatDuration,
-  parseDuration,
-  formatPercent,
-  parsePercent,
-  isoToDate,
-  formatIsoAs,
-} from "../lib/format.ts";
-
-// Borrador: todo como string, tal cual se teclea (la Duration se parsea al guardar).
-type Draft = {
-  title: string;
-  start: string; // YYYY-MM-DD o ""
-  end: string; // YYYY-MM-DD o ""
-  duration: string; // "Nd" / "Nw"
-  progress: string; // "40%" (se parsea al guardar)
-  barColor: BarColorKey; // "" = el color por defecto
-  barTitle: string; // "" = sin rótulo sobre la barra
-  owner: string;
-  dependencies: string;
-  descriptionMd: string;
-};
-
-const draftOf = (task: Task): Draft => ({
-  title: task.title,
-  start: isoToDate(task.start),
-  end: isoToDate(task.end),
-  duration: formatDuration(task.durationDays),
-  progress: formatPercent(task.progress),
-  barColor: barColorKey(task.barColor),
-  barTitle: task.barTitle ?? "",
-  owner: task.owner ?? "",
-  dependencies: task.dependencies ?? "",
-  descriptionMd: task.descriptionMd ?? "",
-});
+import { BAR_COLORS } from "../lib/barColors.ts";
+import { formatIsoAs } from "../lib/format.ts";
+import { useTaskDraft } from "./useTaskDraft.ts";
 
 export function TaskModal() {
   const modalTaskId = useUI((s) => s.modalTaskId);
@@ -60,44 +25,16 @@ export function TaskModal() {
     () => tasks.find((t) => t.id === modalTaskId) ?? null,
     [tasks, modalTaskId],
   );
-  const isParent = useMemo(
-    () => (task ? tasks.some((t) => t.parentId === task.id) : false),
-    [tasks, task],
-  );
+  const parentIds = useParentIds();
+  const isParent = task != null && parentIds.has(task.id);
 
-  const [draft, setDraft] = useState<Draft | null>(null);
-  // Espejo del borrador en un ref: los handlers (en particular el de Guardar) leen
-  // el último valor de forma sincrónica, sin esperar al re-render.
-  const draftRef = useRef<Draft | null>(null);
-  // Valores al abrir el modal: se envía solo lo que cambió respecto a esta base.
-  const baseRef = useRef<Draft | null>(null);
+  // Borrador del formulario y diff de lo que cambió: ver useTaskDraft.
+  const { draft, setField, buildPatch } = useTaskDraft(task, { isParent, daysPerMonth });
   const [saving, setSaving] = useState(false);
   const selectAll = useSelectAllOnFocus();
 
-  const setField = <K extends keyof Draft>(key: K, value: Draft[K]) => {
-    const current = draftRef.current;
-    if (!current) return;
-    const next = { ...current, [key]: value };
-    draftRef.current = next;
-    setDraft(next);
-  };
-
-  // Inicializa (y resetea) el borrador al abrir el modal de una tarea.
-  useEffect(() => {
-    if (!task) {
-      draftRef.current = null;
-      baseRef.current = null;
-      setDraft(null);
-      return;
-    }
-    const initial = draftOf(task);
-    draftRef.current = initial;
-    baseRef.current = initial;
-    setDraft(initial);
-    setSaving(false);
-    // Solo al cambiar de tarea: un refetch en segundo plano no debe pisar lo tecleado.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modalTaskId, task?.id]);
+  // Un modal que se reabre no arranca con el botón deshabilitado por el intento anterior.
+  useEffect(() => setSaving(false), [modalTaskId]);
 
   const cancel = () => closeModal();
 
@@ -111,53 +48,8 @@ export function TaskModal() {
 
   if (!modalTaskId || !task || !draft) return null;
 
-  /**
-   * Diff del borrador contra la base, o el mensaje a mostrar si un campo tecleado no
-   * parsea (Duration y % Complete son texto libre). Devolver el mensaje —y no un
-   * `null`— evita que quien llama tenga que adivinar cuál de los dos falló.
-   */
-  const buildPatch = (d: Draft, base: Draft): { data: PatchData } | { error: string } => {
-    const data: PatchData = {};
-    if (d.title !== base.title) data.title = d.title;
-    if (d.owner !== base.owner) data.owner = d.owner;
-    // El color es estilo, no programación: se acepta también en una fila padre (su
-    // barra de resumen se pinta igual). "" es el default, y en la base eso es null.
-    if (d.barColor !== base.barColor) data.barColor = d.barColor || null;
-    if (d.descriptionMd !== base.descriptionMd) data.descriptionMd = d.descriptionMd;
-
-    // En las filas padre Start/End/Duration son calculados y las Dependencies no
-    // aplican (el server rechaza ambos con 409): nunca se envían.
-    if (!isParent) {
-      if (d.dependencies !== base.dependencies) data.dependencies = d.dependencies;
-      // Rótulo de la barra: tampoco se escribe en un padre (su barra es un resumen y no
-      // lo muestra; el server responde 409). "" borra el rótulo, y en la base es null.
-      if (d.barTitle !== base.barTitle) data.barTitle = d.barTitle.trim() || null;
-      if (d.start !== base.start) data.start = d.start;
-      if (d.end !== base.end) data.end = d.end;
-      if (d.duration !== base.duration) {
-        const days = parseDuration(d.duration, daysPerMonth);
-        if (days == null) {
-          return { error: `Invalid Duration: "${d.duration}". Use e.g. 5d, 2w or 1m.` };
-        }
-        data.durationDays = days;
-      }
-      // % Complete: en un padre es roll-up de los hijos (el server responde 409), así
-      // que va dentro de este mismo `if` y nunca se envía desde una fila padre.
-      if (d.progress !== base.progress) {
-        const pct = parsePercent(d.progress);
-        if (pct == null) {
-          return { error: `Invalid % Complete: "${d.progress}". Use a number from 0 to 100.` };
-        }
-        data.progress = pct;
-      }
-    }
-    return { data };
-  };
-
   const save = async () => {
-    const d = draftRef.current!;
-    const base = baseRef.current!;
-    const built = buildPatch(d, base);
+    const built = buildPatch();
     if ("error" in built) {
       showError(built.error);
       return;
@@ -364,5 +256,3 @@ export function TaskModal() {
     </div>
   );
 }
-
-export type { Task };

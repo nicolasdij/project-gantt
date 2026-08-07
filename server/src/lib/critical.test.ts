@@ -5,6 +5,7 @@ import { computeCriticalPath, type CriticalTask } from "./critical.ts";
 const D = (s: string) => new Date(`${s}T00:00:00.000Z`);
 const t = (p: Partial<CriticalTask> & { id: number }): CriticalTask => ({
   parentId: null,
+  order: p.id, // el CPM no lo usa; solo ordena hermanos al agrupar hijos
   start: null,
   end: null,
   durationDays: 1,
