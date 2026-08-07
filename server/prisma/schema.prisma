@@ -47,6 +47,13 @@ model Task {
   // null = el color por defecto (la paleta lo ofrece como una opción más).
   barColor      String?
 
+  // Rótulo que se dibuja sobre la barra del Gantt (una línea). Solo se muestra en las
+  // HOJAS: la barra de un padre es un resumen. null/vacío = sin rótulo, que es el valor
+  // con el que quedan todas las filas existentes. Cuando una hoja pasa a ser padre el
+  // valor se CONSERVA (deja de mostrarse, nada más): volver a sacarla de padre lo
+  // devuelve, y borrarlo por nuestra cuenta sería perder algo que el usuario escribió.
+  barTitle      String?
+
   // Un solo responsable.
   owner         String?
 

@@ -151,8 +151,11 @@ export async function taskRoutes(app: FastifyInstance) {
     const touchesDates = DATE_FIELDS.some((f) => f in body);
     const touchesDeps = "dependencies" in body;
     const touchesProgress = "progress" in body;
+    const touchesBarTitle = "barTitle" in body;
     const parent =
-      touchesDates || touchesDeps || touchesProgress ? await isParent(id) : false;
+      touchesDates || touchesDeps || touchesProgress || touchesBarTitle
+        ? await isParent(id)
+        : false;
     if (parent && touchesProgress) {
       return reply.code(409).send({
         error:
@@ -169,6 +172,21 @@ export async function taskRoutes(app: FastifyInstance) {
         });
       }
       data.barColor = color;
+    }
+    // Rótulo de la barra: solo en las HOJAS (la barra de un padre es un resumen). El
+    // valor de una fila que se volvió padre se conserva —deja de mostrarse, nada más—,
+    // así que esto rechaza ESCRIBIRLO, no tenerlo.
+    if (parent && touchesBarTitle) {
+      return reply.code(409).send({
+        error:
+          "A parent row cannot have a bar title: its bar is a summary rolled up from its children. Set it on the children instead.",
+      });
+    }
+    if (touchesBarTitle) {
+      // Vacío (o solo espacios) se guarda como null: "sin rótulo" es un único valor, el
+      // mismo con el que quedaron todas las filas anteriores a este campo.
+      const text = body.barTitle == null ? "" : String(body.barTitle).trim();
+      data.barTitle = text || null;
     }
     if (touchesProgress) {
       const n = Number(body.progress);

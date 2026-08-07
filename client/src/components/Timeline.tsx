@@ -10,6 +10,7 @@ import { parseDependencies } from "../lib/deps.ts";
 import { buildTimeScale } from "../lib/timeScale.ts";
 import { addDaysIso, addWorkingDaysIso, isoToDate, snapToWorkingDayIso } from "../lib/format.ts";
 import { barColorClass } from "../lib/barColors.ts";
+import { BAR_TITLE_GAP, fitsInBar } from "../lib/barTitle.ts";
 import { ROW_H, HEAD_H } from "../lib/layout.ts";
 
 type Geom = { startX: number; endX: number; cy: number; isMilestone: boolean };
@@ -169,6 +170,26 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
     });
     return map;
   }, [rows, scale]);
+
+  // Rótulos de barra (campo "Bar title"). Se resuelve acá, y no dentro del map de las
+  // barras, porque el que NO entra se dibuja en su propia capa: va después de las
+  // flechas para que no le cruce una línea por encima del texto.
+  const barTitles = useMemo(() => {
+    const map = new Map<number, { text: string; inside: boolean; x: number; cy: number }>();
+    for (const t of rows) {
+      // En una fila padre no se dibuja: su barra es un resumen de los hijos. El valor
+      // sigue guardado —si vuelve a ser hoja, reaparece—, solo se oculta.
+      if (parentIds.has(t.id)) continue;
+      const text = (t.barTitle ?? "").trim();
+      if (!text || !t.start || !t.end) continue;
+      const g = geom.get(t.id);
+      if (!g) continue;
+      // El rombo de un milestone no tiene ancho donde escribir: siempre afuera.
+      const inside = !t.isMilestone && fitsInBar(text, Math.max(2, g.endX - g.startX));
+      map.set(t.id, { text, inside, x: g.endX + BAR_TITLE_GAP, cy: g.cy });
+    }
+    return map;
+  }, [rows, geom, parentIds]);
 
   const bodyHeight = tasks.length * ROW_H;
 
@@ -333,6 +354,11 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
                 {/* Antes que los tiradores en el DOM: así el resaltado de los bordes
                     al pasar el mouse sigue quedando por encima del relleno. */}
                 {fillW >= 1 && <span className="tl-bar-fill" style={{ width: fillW }} />}
+                {/* Rótulo que SÍ entra: centrado adentro, después del relleno para que
+                    se dibuje encima de él. El que no entra va en su propia capa. */}
+                {barTitles.get(t.id)?.inside && (
+                  <span className="tl-bar-title">{barTitles.get(t.id)!.text}</span>
+                )}
                 {draggable && (
                   <>
                     <span
@@ -372,6 +398,23 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
               <path key={a.key} d={a.d} className="tl-arrow-path" markerEnd="url(#dep-arrow)" />
             ))}
           </svg>
+
+          {/* Rótulos que no entran en su barra: afuera, a la derecha del borde. Van
+              DESPUÉS del SVG para que el texto quede por encima de las flechas y no
+              cruzado por una línea. */}
+          {rows.map((t) => {
+            const bt = barTitles.get(t.id);
+            if (!bt || bt.inside) return null;
+            return (
+              <div
+                key={`bt${t.id}`}
+                className="tl-bar-title-out"
+                style={{ left: bt.x, top: bt.cy - ROW_H / 2, height: ROW_H }}
+              >
+                {bt.text}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

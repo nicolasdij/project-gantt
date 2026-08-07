@@ -208,6 +208,45 @@ body {
 .tl-bar-parent.tl-critical .tl-bar-fill {
   background: #450a0a;
 }
+/* Rótulo de la barra (campo "Bar title"), cuando el texto ENTRA: centrado adentro, en
+   blanco porque va sobre el color de la barra (y sobre su relleno, más oscuro todavía).
+   `pointer-events: none` para que el cuerpo se siga arrastrando por encima del texto.
+   `overflow: hidden` como red: si la medición quedara corta por redondeos del navegador,
+   el texto se recorta contra la barra en vez de desbordarla.
+   OJO: font-size y font-family tienen que coincidir con LABEL_FONT en lib/barTitle.ts,
+   que es la fuente con la que se mide si el texto entra; y el margen lateral, con
+   BAR_TITLE_PAD. */
+.tl-bar-title {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* Cuando NO entra: afuera, a la derecha de la barra. Va en el color de texto normal
+   porque el fondo es el del panel y no la barra. z-index 2 = el de las flechas, y por
+   ser posterior en el DOM el texto queda encima de ellas; por debajo de la cabecera
+   (z-index 3), que es sticky y tiene que taparlo al hacer scroll. */
+.tl-bar-title-out {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
 /* El cuerpo de la barra se arrastra para mover Start y End juntos (los bordes
    redimensionan; ver .tl-bar-handle). En los padres no aplica: son roll-up. */
 .tl-bar-draggable {

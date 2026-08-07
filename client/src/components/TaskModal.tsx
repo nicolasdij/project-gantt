@@ -28,6 +28,7 @@ type Draft = {
   duration: string; // "Nd" / "Nw"
   progress: string; // "40%" (se parsea al guardar)
   barColor: BarColorKey; // "" = el color por defecto
+  barTitle: string; // "" = sin rótulo sobre la barra
   owner: string;
   dependencies: string;
   descriptionMd: string;
@@ -40,6 +41,7 @@ const draftOf = (task: Task): Draft => ({
   duration: formatDuration(task.durationDays),
   progress: formatPercent(task.progress),
   barColor: barColorKey(task.barColor),
+  barTitle: task.barTitle ?? "",
   owner: task.owner ?? "",
   dependencies: task.dependencies ?? "",
   descriptionMd: task.descriptionMd ?? "",
@@ -127,6 +129,9 @@ export function TaskModal() {
     // aplican (el server rechaza ambos con 409): nunca se envían.
     if (!isParent) {
       if (d.dependencies !== base.dependencies) data.dependencies = d.dependencies;
+      // Rótulo de la barra: tampoco se escribe en un padre (su barra es un resumen y no
+      // lo muestra; el server responde 409). "" borra el rótulo, y en la base es null.
+      if (d.barTitle !== base.barTitle) data.barTitle = d.barTitle.trim() || null;
       if (d.start !== base.start) data.start = d.start;
       if (d.end !== base.end) data.end = d.end;
       if (d.duration !== base.duration) {
@@ -277,6 +282,28 @@ export function TaskModal() {
             </label>
           </div>
 
+          {/* Rótulo sobre la barra. Va junto al color: los dos son la presentación de
+              la barra en el Gantt, no datos de la tarea. */}
+          <div className="field-row">
+            <label className="field">
+              <span>Bar title</span>
+              {isParent ? (
+                <span className="ro" title="A parent row's bar is a summary rolled up from its children, so it does not show a bar title. The value is kept: it comes back if the row stops being a parent.">
+                  {draft.barTitle || "—"}
+                </span>
+              ) : (
+                <input
+                  className="cell-input"
+                  placeholder="empty = no label on the bar"
+                  title="Text drawn on this row's Gantt bar: centred inside it if it fits, and just to the right of the bar if it doesn't."
+                  value={draft.barTitle}
+                  {...selectAll}
+                  onChange={(e) => setField("barTitle", e.target.value)}
+                />
+              )}
+            </label>
+          </div>
+
           {/* OJO: <div> y no <label>, por lo mismo que el editor de Markdown: un
               <label> se asocia al primer elemento labelable que contiene —acá el
               primer botón de la paleta— y clickear el texto "Bar colour" elegiría el
@@ -306,7 +333,9 @@ export function TaskModal() {
             <p className="hint">
               Start/End/Duration and % Complete of a parent row are rolled up from its children
               (not editable), so it cannot have dependencies either — set them on the first child
-              instead.
+              instead. Its bar is a summary too, so it shows no <strong>Bar title</strong>: a
+              value set before is kept, not deleted, and comes back if the row stops being a
+              parent.
             </p>
           )}
 

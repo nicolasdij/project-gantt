@@ -12,6 +12,8 @@ export type Task = {
   progress: number;
   /** Clave de la paleta ("green", "amber"…) o null = color por defecto. */
   barColor: string | null;
+  /** Rótulo sobre la barra del Gantt (null = sin rótulo). Solo se muestra en las hojas. */
+  barTitle: string | null;
   owner: string | null;
   dependencies: string | null;
   descriptionMd: string | null;
@@ -25,6 +27,7 @@ export type EditableField =
   | "durationDays"
   | "progress"
   | "barColor"
+  | "barTitle"
   | "owner"
   | "dependencies"
   | "descriptionMd";

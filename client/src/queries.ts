@@ -40,9 +40,10 @@ function isBlankRow(t: Task): boolean {
     !t.end &&
     t.durationDays === NEW_ROW_DURATION_DAYS &&
     // Un avance tipeado es contenido real (la fila nace en 0%), igual que un color
-    // de barra elegido a mano (la fila nace con el default).
+    // de barra elegido a mano o un rótulo escrito (la fila nace sin ninguno de los dos).
     t.progress === 0 &&
     !t.barColor &&
+    !(t.barTitle ?? "").trim() &&
     !(t.owner ?? "").trim() &&
     !(t.dependencies ?? "").trim() &&
     // No está en el grid, pero una fila con descripción tiene contenido real.
