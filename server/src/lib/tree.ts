@@ -36,6 +36,20 @@ export function makeIsAncestor(tasks: { id: number; parentId: number | null }[])
   };
 }
 
+/**
+ * Devuelve `esPadre(id)`: si la fila tiene al menos un hijo. Es la pregunta que decide
+ * qué campos son DERIVADOS (fechas, % Complete) y cuáles no se dibujan (rótulo de la
+ * barra), así que conviene que tenga una sola definición.
+ * (`computeSchedule` no la usa: ya construye el mapa de hijos para el roll-up y le sale
+ * gratis de ahí.)
+ */
+export function makeIsParent(tasks: { id: number; parentId: number | null }[]) {
+  const withChildren = new Set(
+    tasks.map((t) => t.parentId).filter((x): x is number => x != null),
+  );
+  return (id: number): boolean => withChildren.has(id);
+}
+
 /** Agrupa hijos por padre y ordena cada grupo por `order`. */
 export function groupChildren<T extends TreeTask>(tasks: T[]): Map<number | null, T[]> {
   const byParent = new Map<number | null, T[]>();

@@ -13,11 +13,19 @@ function sameDate(a: Date | null, b: Date | null): boolean {
   return a.getTime() === b.getTime();
 }
 
+/** Fila de `tasks` tal como la devuelve Prisma. */
+type TaskRow = Awaited<ReturnType<typeof prisma.task.findMany>>[number];
+
 /**
  * Recalcula estructura (WBS/orden), fechas (scheduling + roll-up) y avance (roll-up)
  * de todo el proyecto y guarda solo las filas cuyos campos calculados cambiaron.
+ *
+ * Devuelve el proyecto YA recalculado y en orden de presentación. Es exactamente lo que
+ * quedó en la base —los campos calculados son los mismos que se acaban de escribir—, así
+ * que las rutas responden con esto en vez de volver a leer la tabla: era un `findMany`
+ * más por cada mutación, y con autosave por celda ese es el camino caliente.
  */
-export async function recomputeProject(): Promise<number> {
+export async function recomputeProject(): Promise<TaskRow[]> {
   const tasks = await prisma.task.findMany();
   const structure = computeStructure(tasks as unknown as TreeTask[]);
   const schedule = computeSchedule(tasks as unknown as ScheduleTask[]);
@@ -34,11 +42,25 @@ export async function recomputeProject(): Promise<number> {
   );
 
   const updates: Promise<unknown>[] = [];
+  const fresh: TaskRow[] = [];
   for (const t of tasks) {
     const s = structure.get(t.id);
     const d = schedule.get(t.id);
     const p = progress.get(t.id);
-    if (!s || !d || p == null) continue;
+    if (!s || !d || p == null) {
+      fresh.push(t); // fila sin resultado (dato inconsistente): queda como estaba
+      continue;
+    }
+    fresh.push({
+      ...t,
+      wbs: s.wbs,
+      order: s.order,
+      start: d.start,
+      end: d.end,
+      durationDays: d.durationDays,
+      isMilestone: d.isMilestone,
+      progress: p,
+    });
 
     const changed =
       s.wbs !== t.wbs ||
@@ -68,11 +90,5 @@ export async function recomputeProject(): Promise<number> {
   }
 
   if (updates.length > 0) await prisma.$transaction(updates as any);
-  return updates.length;
-}
-
-/** ¿La tarea tiene hijos? (los padres no permiten editar Start/End/Duration). */
-export async function isParent(id: number): Promise<boolean> {
-  const count = await prisma.task.count({ where: { parentId: id } });
-  return count > 0;
+  return fresh.sort((a, b) => a.order - b.order);
 }
