@@ -6,7 +6,6 @@ import { forwardRef, memo, useEffect, useMemo, useState } from "react";
 import type { Task } from "../types.ts";
 import { useUI } from "../store.ts";
 import { useCriticalPath, useTaskMutations } from "../queries.ts";
-import { parseDependencies } from "../lib/deps.ts";
 import { buildTimeScale } from "../lib/timeScale.ts";
 import { addDaysIso, addWorkingDaysIso, isoToDate, snapToWorkingDayIso } from "../lib/format.ts";
 import { barColorClass } from "../lib/barColors.ts";
@@ -218,7 +217,7 @@ const TimelineImpl = forwardRef<HTMLDivElement, { tasks: Task[] }>(function Time
       if (parentIds.has(t.id)) continue;
       const succ = geom.get(t.id);
       if (!succ || (!t.start && !t.end)) continue;
-      for (const dep of parseDependencies(t.dependencies)) {
+      for (const dep of t.deps) {
         const predId = idBySeq.get(dep.predId); // dep.predId es un ID visible
         if (predId == null) continue;
         const pred = geom.get(predId);

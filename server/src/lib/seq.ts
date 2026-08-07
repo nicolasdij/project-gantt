@@ -7,7 +7,7 @@
 // borde —y en un solo lugar— es lo que permite reordenar filas sin reescribir el campo
 // de nadie.
 
-import { remapDependencies } from "./deps.ts";
+import { parseDependencies, remapDependencies, type Dependency } from "./deps.ts";
 
 export type SeqTask = { id: number; order: number };
 
@@ -29,10 +29,22 @@ export function buildMaps(tasks: SeqTask[]): SeqMaps {
   return { idToSeq, seqToId };
 }
 
-/** La tarea con sus Dependencies traducidas a ID visible (o sea, lista para el cliente). */
+/**
+ * La tarea lista para el cliente: sus Dependencies traducidas a ID visible, y además YA
+ * PARSEADAS en `deps`.
+ *
+ * Mandar las dos cosas es a propósito. `dependencies` es lo que se muestra y se edita
+ * (texto, tal cual lo escribió el usuario); `deps` es lo que el cliente necesita para
+ * dibujar las flechas. Antes el cliente reparseaba el texto con una copia del parser de
+ * deps.ts, y esa copia era una clase de bug silencioso: cuando el formato creció con los
+ * lags hubo que actualizar los dos parsers en el mismo commit, y olvidarse del cliente
+ * significaba dependencias que programan fechas sin flecha que las explique. Saliendo
+ * las dos del MISMO string en la MISMA función, no pueden discrepar.
+ */
 export function toSeq<T extends { dependencies: string | null }>(
   task: T,
   idToSeq: Map<number, number>,
-): T {
-  return { ...task, dependencies: remapDependencies(task.dependencies, idToSeq) };
+): T & { deps: Dependency[] } {
+  const dependencies = remapDependencies(task.dependencies, idToSeq);
+  return { ...task, dependencies, deps: parseDependencies(dependencies) };
 }
